@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <record id="view_tgm_group_tree" model="ir.ui.view">
-        <field name="name">tgm.group.tree</field>
+    <record id="view_tgm_group_list" model="ir.ui.view">
+        <field name="name">tgm.group.list</field>
         <field name="model">tgm.group</field>
         <field name="arch" type="xml">
-            <tree>
+            <list>
                 <field name="name"/>
                 <field name="chat_id"/>
                 <field name="username"/>
                 <field name="active"/>
-            </tree>
+            </list>
         </field>
     </record>
 
@@ -28,39 +28,39 @@
                     <notebook>
                         <page string="Settings">
                             <field name="setting_ids">
-                                <tree editable="bottom">
+                                <list editable="bottom">
                                     <field name="feature_key"/>
                                     <field name="enabled"/>
                                     <field name="config_json"/>
-                                </tree>
+                                </list>
                             </field>
                         </page>
                         <page string="Rules">
                             <field name="rule_ids">
-                                <tree editable="bottom">
+                                <list editable="bottom">
                                     <field name="pattern"/>
                                     <field name="enabled"/>
-                                </tree>
+                                </list>
                             </field>
                         </page>
                         <page string="Routes">
                             <field name="route_ids">
-                                <tree editable="bottom">
+                                <list editable="bottom">
                                     <field name="keyword"/>
                                     <field name="destination"/>
                                     <field name="gate_group_id"/>
                                     <field name="enabled"/>
-                                </tree>
+                                </list>
                             </field>
                         </page>
                         <page string="Gates">
                             <field name="gate_ids">
-                                <tree editable="bottom">
+                                <list editable="bottom">
                                     <field name="gate_group_id"/>
                                     <field name="gate_title"/>
                                     <field name="join_url"/>
                                     <field name="enabled"/>
-                                </tree>
+                                </list>
                             </field>
                         </page>
                     </notebook>
@@ -72,36 +72,36 @@
     <record id="action_tgm_groups" model="ir.actions.act_window">
         <field name="name">Groups</field>
         <field name="res_model">tgm.group</field>
-        <field name="view_mode">tree,form</field>
+        <field name="view_mode">list,form</field>
     </record>
 
     <record id="action_tgm_rules" model="ir.actions.act_window">
         <field name="name">Rules</field>
         <field name="res_model">tgm.rule</field>
-        <field name="view_mode">tree,form</field>
+        <field name="view_mode">list,form</field>
     </record>
 
     <record id="action_tgm_routes" model="ir.actions.act_window">
         <field name="name">Routes</field>
         <field name="res_model">tgm.route</field>
-        <field name="view_mode">tree,form</field>
+        <field name="view_mode">list,form</field>
     </record>
 
     <record id="action_tgm_gates" model="ir.actions.act_window">
         <field name="name">Gates</field>
         <field name="res_model">tgm.gate</field>
-        <field name="view_mode">tree,form</field>
+        <field name="view_mode">list,form</field>
     </record>
 
     <record id="action_tgm_mod_logs" model="ir.actions.act_window">
         <field name="name">Moderation Logs</field>
         <field name="res_model">tgm.mod.log</field>
-        <field name="view_mode">tree,form</field>
+        <field name="view_mode">list,form</field>
     </record>
 
     <record id="action_tgm_action_events" model="ir.actions.act_window">
         <field name="name">Action Events</field>
         <field name="res_model">tgm.action.event</field>
-        <field name="view_mode">tree,form</field>
+        <field name="view_mode">list,form</field>
     </record>
 </odoo>

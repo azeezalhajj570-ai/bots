@@ -1,4 +1,17 @@
 services:
+  postgres:
+    image: postgres:16
+    container_name: telegram-group-manager-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: botdb
+      POSTGRES_USER: botuser
+      POSTGRES_PASSWORD: botpass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
   bot:
     build:
       context: .
@@ -8,9 +21,15 @@ services:
     env_file:
       - .env
     environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://botuser:botpass@postgres:5432/botdb}
       DB_PATH: /app/data/bot.db
       LOG_DIR: /app/logs
+    depends_on:
+      - postgres
     volumes:
       - ./data:/app/data
       - ./logs:/app/logs
     command: ["python", "bot.py"]
+
+volumes:
+  postgres_data:

@@ -46,6 +46,52 @@ class DB(BotRepository):
         self.conn.execute("INSERT OR IGNORE INTO group_settings(chat_id) VALUES (?)", (chat_id,))
         self.conn.commit()
 
+    def list_group_chat_ids(self) -> list[int]:
+        rows = self.conn.execute(
+            """
+            SELECT DISTINCT chat_id
+            FROM (
+              SELECT chat_id FROM group_settings
+              UNION ALL
+              SELECT chat_id FROM dynamic_remove_rules
+              UNION ALL
+              SELECT chat_id FROM link_routes
+              UNION ALL
+              SELECT chat_id FROM participation_gates
+              UNION ALL
+              SELECT chat_id FROM warnings
+            )
+            ORDER BY chat_id ASC
+            """
+        ).fetchall()
+        return [int(row[0]) for row in rows]
+
+    def get_settings_map(self, chat_id: int) -> dict[str, bool]:
+        self.ensure_group(chat_id)
+        row = self.conn.execute(
+            """
+            SELECT anti_links, anti_bots, hide_system, warn_in_dm, warn_in_group
+            FROM group_settings
+            WHERE chat_id=?
+            """,
+            (chat_id,),
+        ).fetchone()
+        if not row:
+            return {
+                "anti_links": True,
+                "anti_bots": True,
+                "hide_system": False,
+                "warn_in_dm": False,
+                "warn_in_group": True,
+            }
+        return {
+            "anti_links": bool(row[0]),
+            "anti_bots": bool(row[1]),
+            "hide_system": bool(row[2]),
+            "warn_in_dm": bool(row[3]),
+            "warn_in_group": bool(row[4]),
+        }
+
     def get_setting(self, chat_id: int, key: str) -> bool:
         self.ensure_group(chat_id)
         row = self.conn.execute(f"SELECT {key} FROM group_settings WHERE chat_id=?", (chat_id,)).fetchone()

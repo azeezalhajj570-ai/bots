@@ -32,6 +32,7 @@ Create `.env` (or copy from `.env.example`) and set:
 ```env
 BOT_TOKEN=YOUR_TOKEN_HERE
 DB_PATH=bot.db
+DATABASE_URL=
 MAX_WARNS=3
 MUTE_SECONDS=3600
 LOG_LEVEL=INFO
@@ -46,6 +47,7 @@ ODOO_CACHE_TTL_SECONDS=30
 Notes:
 - `MUTE_SECONDS` is the exact mute duration.
 - `TEST_MODE=1` enables strict test behavior globally.
+- `DATABASE_URL` enables PostgreSQL backend for the bot. If empty, bot falls back to SQLite using `DB_PATH`.
 - Set `ODOO_API_BASE_URL` and `ODOO_API_TOKEN` to enable external Odoo API integration (scaffolded client).
 - `ODOO_CACHE_TTL_SECONDS` controls settings/rules/routes/gates cache duration for Odoo API reads.
 
@@ -87,7 +89,8 @@ docker compose down
 ```
 
 Notes:
-- SQLite data is persisted at `./data/bot.db` (mounted to `/app/data/bot.db` in container).
+- PostgreSQL is available as service `postgres` and used by default via `DATABASE_URL`.
+- SQLite fallback data is persisted at `./data/bot.db` (mounted to `/app/data/bot.db` in container) when `DATABASE_URL` is empty.
 - Logs are persisted at `./logs` (mounted to `/app/logs`).
 - To run test mode in Docker:
 
@@ -144,8 +147,8 @@ If a message is sent as anonymous admin identity (`sender_chat`, often shown lik
 ## Database Migrations
 
 - SQLite schema is managed with SQL migrations in `group_manager_bot/migrations/`.
-- Applied versions are tracked in `schema_version`.
-- Current migration set:
+- PostgreSQL schema is initialized automatically at startup by the bot.
+- Current SQLite migration set:
   - `001_init.sql`
   - `002_outbox.sql`
   - `003_indexes.sql`
@@ -153,6 +156,20 @@ If a message is sent as anonymous admin identity (`sender_chat`, often shown lik
   - `005_warn_delivery.sql`
   - `006_warn_group_delivery.sql`
   - `007_participation_gates.sql`
+
+## Move Existing Data to PostgreSQL
+
+If you already have data in `bot.db`, migrate once:
+
+```bash
+python scripts/migrate_sqlite_to_postgres.py --sqlite-path ./data/bot.db --database-url "postgresql://botuser:botpass@localhost:5432/botdb"
+```
+
+Then set `DATABASE_URL` in `.env` and restart:
+
+```bash
+docker compose up -d --build
+```
 
 ## Odoo API (Scaffold)
 

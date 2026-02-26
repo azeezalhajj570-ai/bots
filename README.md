@@ -64,6 +64,12 @@ python bot.py --test
 - `/start` - Basic bot status/help
 - `/settings` - Open moderation settings panel (group)
 - `/resetwarns` - Reply to a user message and reset warnings
+- `/addrule <regex>` - Add dynamic remove rule (admin)
+- `/delrule <id>` - Delete dynamic remove rule
+- `/listrules` - List dynamic remove rules
+- `/addroute <keyword> <url> [gate_group_id]` - Add keyword route
+- `/delroute <keyword>` - Delete keyword route
+- `/listroutes` - List keyword routes
 
 These commands are also registered to Telegram command menu at startup.
 
@@ -84,6 +90,10 @@ Without these, anti-link deletion or mute actions will fail.
   - warning count is capped at threshold,
   - links are still deleted,
   - user is muted if currently not restricted.
+- Dynamic remove rules: regex-based ban rules configurable per chat.
+- Link routes: keyword-based destination replies; can require membership in another group.
+- Hide join/leave system messages: toggle in `/settings`.
+- Warning delivery mode: toggle in `/settings` (group message or DM).
 
 ## Anonymous Admin Limitation
 
@@ -95,8 +105,17 @@ If a message is sent as anonymous admin identity (`sender_chat`, often shown lik
 - Rotating file logs are written to `LOG_DIR/bot.log`.
 - HTTP request noise (`httpx`, `httpcore`) is reduced to warning level.
 
+## Database Migrations
+
+- SQLite schema is managed with SQL migrations in `group_manager_bot/migrations/`.
+- Applied versions are tracked in `schema_version`.
+- Current migration set:
+  - `001_init.sql`
+  - `002_outbox.sql`
+  - `003_indexes.sql`
+  - `004_dynamic_rules_and_routes.sql`
+
 ## Project Entry
 
 - Main script: `bot.py`
 - Package: `group_manager_bot/`
-

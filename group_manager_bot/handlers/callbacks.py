@@ -7,13 +7,13 @@ from telegram.constants import ChatMemberStatus
 from telegram.error import BadRequest
 from telegram.ext import ContextTypes
 
-from ..db import DB
 from ..keyboards import build_settings_keyboard, settings_text
+from ..storage import BotRepository
 
 log = logging.getLogger(__name__)
 
 
-async def _safe_edit_settings(query, chat_id: int, db: DB) -> None:
+async def _safe_edit_settings(query, chat_id: int, db: BotRepository) -> None:
     try:
         await query.edit_message_text(
             settings_text(db, chat_id),
@@ -27,7 +27,7 @@ async def _safe_edit_settings(query, chat_id: int, db: DB) -> None:
         raise
 
 
-def make_callbacks(db: DB):
+def make_callbacks(db: BotRepository):
     async def callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         q = update.callback_query
         if not q or not q.message:
@@ -49,10 +49,12 @@ def make_callbacks(db: DB):
 
         if action == "toggle" and len(parts) == 3:
             key = parts[1]
-            if key not in ("anti_links", "anti_bots"):
+            if key not in ("anti_links", "anti_bots", "hide_system", "warn_in_dm", "warn_in_group"):
                 return
             new_val = db.toggle_setting(chat_id, key)
             log.info("Setting changed chat=%s %s=%s by user=%s", chat_id, key, new_val, q.from_user.id)
+            await _safe_edit_settings(q, chat_id, db)
+        elif action == "selectgroup":
             await _safe_edit_settings(q, chat_id, db)
 
         elif action == "refresh":

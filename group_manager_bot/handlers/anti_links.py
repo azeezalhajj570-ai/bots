@@ -7,8 +7,8 @@ from telegram import ChatPermissions, Update
 from telegram.ext import ContextTypes
 
 from ..config import Config
-from ..db import DB
-from ..telegram_helpers import bot_can_ban, bot_can_delete, is_admin, is_group_chat
+from ..storage import BotRepository
+from ..telegram_helpers import bot_can_ban, bot_can_delete, is_admin, is_group_chat, is_user_muted
 
 log = logging.getLogger(__name__)
 
@@ -22,19 +22,7 @@ def _format_mute_duration(seconds: int) -> str:
         return f"{minutes}m"
     return f"{seconds}s"
 
-
-async def _is_currently_muted(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user_id: int) -> bool:
-    try:
-        member = await context.bot.get_chat_member(chat_id, user_id)
-    except Exception as exc:
-        log.warning("Mute-state check failed chat=%s user=%s error=%s", chat_id, user_id, exc)
-        return False
-    status = str(member.status).lower()
-    can_send = getattr(member, "can_send_messages", True)
-    return status == "restricted" and can_send is False
-
-
-def make_anti_links_handler(cfg: Config, db: DB):
+def make_anti_links_handler(cfg: Config, db: BotRepository):
     async def anti_links_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         msg = update.message
         if not msg or not update.effective_chat or not msg.from_user:
@@ -102,7 +90,7 @@ def make_anti_links_handler(cfg: Config, db: DB):
                 )
                 return
 
-            if not await _is_currently_muted(context, chat_id, user.id):
+            if not await is_user_muted(context, chat_id, user.id):
                 if not await bot_can_ban(context, chat_id):
                     await context.bot.send_message(
                         chat_id,
@@ -120,6 +108,9 @@ def make_anti_links_handler(cfg: Config, db: DB):
                         permissions=ChatPermissions(can_send_messages=False),
                         until_date=until,
                     )
+                    cache = context.application.bot_data.get("cache")
+                    if cache:
+                        cache.delete(f"user_muted:{chat_id}:{user.id}")
                     await context.bot.send_message(
                         chat_id,
                         f"{display_name} muted for {mute_for} due to repeated links. Warnings: {warns}/{cfg.max_warns}",
@@ -166,6 +157,9 @@ def make_anti_links_handler(cfg: Config, db: DB):
                 permissions=ChatPermissions(can_send_messages=False),
                 until_date=until,
             )
+            cache = context.application.bot_data.get("cache")
+            if cache:
+                cache.delete(f"user_muted:{chat_id}:{user.id}")
             await context.bot.send_message(
                 chat_id,
                 f"{display_name} muted for {mute_for} due to repeated links. Warnings: {warns}/{cfg.max_warns}",

@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from telegram import Update
 
 from .app import build_app
+from .cache import MemoryCache
 from .config import load_config
 from .db import DB
 from .logging_config import setup_logging
@@ -22,9 +23,10 @@ def main(test_mode: bool = False) -> None:
     if test_mode:
         cfg = replace(cfg, test_mode=True)
     db = DB(cfg.db_path)
+    cache = MemoryCache()
 
     log.info("Starting bot (test_mode=%s)...", cfg.test_mode)
-    app = build_app(cfg, db)
+    app = build_app(cfg, db, cache)
 
     try:
         log.info("Polling started.")

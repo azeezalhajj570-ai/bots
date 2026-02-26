@@ -5,13 +5,13 @@ import logging
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from ..db import DB
+from ..storage import FeatureSettingsRepo
 from ..telegram_helpers import bot_can_ban
 
 log = logging.getLogger(__name__)
 
 
-def make_anti_bots_handler(db: DB):
+def make_anti_bots_handler(db: FeatureSettingsRepo):
     async def anti_bots_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         msg = update.message
         if not msg or not update.effective_chat:
@@ -40,4 +40,3 @@ def make_anti_bots_handler(db: DB):
                     log.error("Failed banning bot %s in chat=%s: %s", m.id, chat_id, e)
 
     return anti_bots_handler
-

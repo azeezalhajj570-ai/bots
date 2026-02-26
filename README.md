@@ -65,6 +65,36 @@ python bot.py --test
 
 `--test` forces anti-link checks for everyone, including admins and bot senders.
 
+## Docker Deployment
+
+1. Create `.env` from `.env.example` and set `BOT_TOKEN`.
+2. Start with Docker Compose:
+
+```bash
+docker compose up -d --build
+```
+
+3. Check logs:
+
+```bash
+docker compose logs -f bot
+```
+
+4. Stop:
+
+```bash
+docker compose down
+```
+
+Notes:
+- SQLite data is persisted at `./data/bot.db` (mounted to `/app/data/bot.db` in container).
+- Logs are persisted at `./logs` (mounted to `/app/logs`).
+- To run test mode in Docker:
+
+```bash
+docker compose run --rm bot python bot.py --test
+```
+
 ## Bot Commands
 
 - `/start` - Basic bot status/help

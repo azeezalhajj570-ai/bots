@@ -13,8 +13,17 @@ _SETTING_KEYS = {"anti_links", "anti_bots", "hide_system", "warn_in_dm", "warn_i
 
 class PostgresDB(BotRepository):
     def __init__(self, database_url: str) -> None:
+        self.database_url = database_url
         self.conn = psycopg.connect(database_url)
         self._init_schema()
+
+    def _reconnect(self) -> None:
+        try:
+            self.conn.close()
+        except Exception:
+            pass
+        self.conn = psycopg.connect(self.database_url)
+        log.info("PostgreSQL connection re-established.")
 
     def _init_schema(self) -> None:
         with self.conn.cursor() as cur:
@@ -297,19 +306,27 @@ class PostgresDB(BotRepository):
         return deleted
 
     def upsert_participation_gate(self, chat_id: int, gate_group_id: int, gate_title: str, join_url: str) -> None:
-        with self.conn.cursor() as cur:
-            cur.execute(
-                """
-                INSERT INTO participation_gates(chat_id, gate_group_id, gate_title, join_url, enabled)
-                VALUES (%s, %s, %s, %s, TRUE)
-                ON CONFLICT(chat_id, gate_group_id) DO UPDATE SET
-                  gate_title=EXCLUDED.gate_title,
-                  join_url=EXCLUDED.join_url,
-                  enabled=TRUE
-                """,
-                (chat_id, gate_group_id, gate_title, join_url),
-            )
-        self.conn.commit()
+        for attempt in range(2):
+            try:
+                with self.conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        INSERT INTO participation_gates(chat_id, gate_group_id, gate_title, join_url, enabled)
+                        VALUES (%s, %s, %s, %s, TRUE)
+                        ON CONFLICT(chat_id, gate_group_id) DO UPDATE SET
+                          gate_title=EXCLUDED.gate_title,
+                          join_url=EXCLUDED.join_url,
+                          enabled=TRUE
+                        """,
+                        (chat_id, gate_group_id, gate_title, join_url),
+                    )
+                self.conn.commit()
+                return
+            except (psycopg.OperationalError, psycopg.InterfaceError) as exc:
+                if attempt == 1:
+                    raise
+                log.warning("PostgreSQL connection dropped during gate upsert, retrying once: %s", exc)
+                self._reconnect()
 
     def list_participation_gates(self, chat_id: int) -> list[ParticipationGate]:
         with self.conn.cursor() as cur:

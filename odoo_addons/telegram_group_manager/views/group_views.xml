@@ -4,12 +4,12 @@
         <field name="name">tgm.group.list</field>
         <field name="model">tgm.group</field>
         <field name="arch" type="xml">
-            <list>
-                <field name="name"/>
-                <field name="chat_id"/>
-                <field name="username"/>
-                <field name="company_id" groups="base.group_multi_company"/>
-                <field name="active"/>
+            <list default_order="name asc">
+                <field name="name" optional="show"/>
+                <field name="chat_id" optional="show"/>
+                <field name="username" optional="show"/>
+                <field name="company_id" groups="base.group_multi_company" optional="show"/>
+                <field name="active" optional="show"/>
             </list>
         </field>
     </record>
@@ -71,9 +71,217 @@
         </field>
     </record>
 
+    <record id="view_tgm_group_setting_list" model="ir.ui.view">
+        <field name="name">tgm.group.setting.list</field>
+        <field name="model">tgm.group.setting</field>
+        <field name="arch" type="xml">
+            <list default_order="group_id asc, feature_key asc">
+                <field name="group_id" optional="show"/>
+                <field name="feature_key" optional="show"/>
+                <field name="enabled" optional="show"/>
+                <field name="config_json" optional="hide"/>
+                <field name="company_id" groups="base.group_multi_company" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_tgm_group_setting_form" model="ir.ui.view">
+        <field name="name">tgm.group.setting.form</field>
+        <field name="model">tgm.group.setting</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <field name="group_id"/>
+                        <field name="feature_key"/>
+                        <field name="enabled"/>
+                        <field name="config_json"/>
+                        <field name="company_id" groups="base.group_multi_company" readonly="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_tgm_rule_list" model="ir.ui.view">
+        <field name="name">tgm.rule.list</field>
+        <field name="model">tgm.rule</field>
+        <field name="arch" type="xml">
+            <list default_order="id desc">
+                <field name="group_id" optional="show"/>
+                <field name="pattern" optional="show"/>
+                <field name="enabled" optional="show"/>
+                <field name="company_id" groups="base.group_multi_company" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_tgm_rule_form" model="ir.ui.view">
+        <field name="name">tgm.rule.form</field>
+        <field name="model">tgm.rule</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <field name="group_id"/>
+                        <field name="pattern"/>
+                        <field name="enabled"/>
+                        <field name="company_id" groups="base.group_multi_company" readonly="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_tgm_route_list" model="ir.ui.view">
+        <field name="name">tgm.route.list</field>
+        <field name="model">tgm.route</field>
+        <field name="arch" type="xml">
+            <list default_order="keyword asc">
+                <field name="group_id" optional="show"/>
+                <field name="keyword" optional="show"/>
+                <field name="destination" optional="show"/>
+                <field name="gate_group_id" optional="show"/>
+                <field name="enabled" optional="show"/>
+                <field name="company_id" groups="base.group_multi_company" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_tgm_route_form" model="ir.ui.view">
+        <field name="name">tgm.route.form</field>
+        <field name="model">tgm.route</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <field name="group_id"/>
+                        <field name="keyword"/>
+                        <field name="destination"/>
+                        <field name="gate_group_id"/>
+                        <field name="enabled"/>
+                        <field name="company_id" groups="base.group_multi_company" readonly="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_tgm_gate_list" model="ir.ui.view">
+        <field name="name">tgm.gate.list</field>
+        <field name="model">tgm.gate</field>
+        <field name="arch" type="xml">
+            <list default_order="gate_title asc">
+                <field name="group_id" optional="show"/>
+                <field name="gate_group_id" optional="show"/>
+                <field name="gate_title" optional="show"/>
+                <field name="join_url" optional="show"/>
+                <field name="enabled" optional="show"/>
+                <field name="company_id" groups="base.group_multi_company" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_tgm_gate_form" model="ir.ui.view">
+        <field name="name">tgm.gate.form</field>
+        <field name="model">tgm.gate</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <field name="group_id"/>
+                        <field name="gate_group_id"/>
+                        <field name="gate_title"/>
+                        <field name="join_url"/>
+                        <field name="enabled"/>
+                        <field name="company_id" groups="base.group_multi_company" readonly="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_tgm_mod_log_list" model="ir.ui.view">
+        <field name="name">tgm.mod.log.list</field>
+        <field name="model">tgm.mod.log</field>
+        <field name="arch" type="xml">
+            <list create="0" edit="0" delete="0" default_order="create_date desc">
+                <field name="create_date" optional="show"/>
+                <field name="group_id" optional="show"/>
+                <field name="chat_id" optional="show"/>
+                <field name="action" optional="show"/>
+                <field name="reason" optional="show"/>
+                <field name="user_id" optional="hide"/>
+                <field name="company_id" groups="base.group_multi_company" optional="show"/>
+                <field name="meta_json" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_tgm_mod_log_form" model="ir.ui.view">
+        <field name="name">tgm.mod.log.form</field>
+        <field name="model">tgm.mod.log</field>
+        <field name="arch" type="xml">
+            <form create="0" edit="0" delete="0">
+                <sheet>
+                    <group>
+                        <field name="create_date" readonly="1"/>
+                        <field name="group_id" readonly="1"/>
+                        <field name="chat_id" readonly="1"/>
+                        <field name="action" readonly="1"/>
+                        <field name="reason" readonly="1"/>
+                        <field name="user_id" readonly="1"/>
+                        <field name="company_id" groups="base.group_multi_company" readonly="1"/>
+                        <field name="meta_json" readonly="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_tgm_action_event_list" model="ir.ui.view">
+        <field name="name">tgm.action.event.list</field>
+        <field name="model">tgm.action.event</field>
+        <field name="arch" type="xml">
+            <list create="0" edit="0" delete="0" default_order="create_date desc">
+                <field name="create_date" optional="show"/>
+                <field name="group_id" optional="show"/>
+                <field name="chat_id" optional="show"/>
+                <field name="event_name" optional="show"/>
+                <field name="company_id" groups="base.group_multi_company" optional="show"/>
+                <field name="payload_json" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_tgm_action_event_form" model="ir.ui.view">
+        <field name="name">tgm.action.event.form</field>
+        <field name="model">tgm.action.event</field>
+        <field name="arch" type="xml">
+            <form create="0" edit="0" delete="0">
+                <sheet>
+                    <group>
+                        <field name="create_date" readonly="1"/>
+                        <field name="group_id" readonly="1"/>
+                        <field name="chat_id" readonly="1"/>
+                        <field name="event_name" readonly="1"/>
+                        <field name="company_id" groups="base.group_multi_company" readonly="1"/>
+                        <field name="payload_json" readonly="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
     <record id="action_tgm_groups" model="ir.actions.act_window">
         <field name="name">Groups</field>
         <field name="res_model">tgm.group</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <record id="action_tgm_group_settings" model="ir.actions.act_window">
+        <field name="name">Group Settings</field>
+        <field name="res_model">tgm.group.setting</field>
         <field name="view_mode">list,form</field>
     </record>
 

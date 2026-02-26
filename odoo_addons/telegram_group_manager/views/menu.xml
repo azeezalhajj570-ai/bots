@@ -1,11 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <menuitem id="menu_tgm_root" name="Telegram Bot Manager" sequence="10"/>
-    <menuitem id="menu_tgm_groups" name="Groups" parent="menu_tgm_root" action="action_tgm_groups" sequence="10"/>
-    <menuitem id="menu_tgm_rules" name="Rules" parent="menu_tgm_root" action="action_tgm_rules" sequence="20"/>
-    <menuitem id="menu_tgm_routes" name="Routes" parent="menu_tgm_root" action="action_tgm_routes" sequence="30"/>
-    <menuitem id="menu_tgm_gates" name="Gates" parent="menu_tgm_root" action="action_tgm_gates" sequence="40"/>
-    <menuitem id="menu_tgm_mod_logs" name="Moderation Logs" parent="menu_tgm_root" action="action_tgm_mod_logs" sequence="50"/>
-    <menuitem id="menu_tgm_action_events" name="Action Events" parent="menu_tgm_root" action="action_tgm_action_events" sequence="60"/>
-    <menuitem id="menu_tgm_settings" name="Settings" parent="menu_tgm_root" action="action_tgm_settings" sequence="70"/>
+
+    <menuitem id="menu_tgm_management" name="Management" parent="menu_tgm_root" sequence="10"/>
+    <menuitem id="menu_tgm_groups" name="Groups" parent="menu_tgm_management" action="action_tgm_groups" sequence="10"/>
+    <menuitem id="menu_tgm_group_settings" name="Group Settings" parent="menu_tgm_management" action="action_tgm_group_settings" sequence="20"/>
+    <menuitem id="menu_tgm_rules" name="Rules" parent="menu_tgm_management" action="action_tgm_rules" sequence="30"/>
+    <menuitem id="menu_tgm_routes" name="Routes" parent="menu_tgm_management" action="action_tgm_routes" sequence="40"/>
+    <menuitem id="menu_tgm_gates" name="Gates" parent="menu_tgm_management" action="action_tgm_gates" sequence="50"/>
+
+    <menuitem id="menu_tgm_monitoring" name="Monitoring" parent="menu_tgm_root" sequence="20"/>
+    <menuitem id="menu_tgm_mod_logs" name="Moderation Logs" parent="menu_tgm_monitoring" action="action_tgm_mod_logs" sequence="10"/>
+    <menuitem id="menu_tgm_action_events" name="Action Events" parent="menu_tgm_monitoring" action="action_tgm_action_events" sequence="20"/>
+
+    <menuitem id="menu_tgm_configuration" name="Configuration" parent="menu_tgm_root" sequence="30"/>
+    <menuitem id="menu_tgm_settings" name="Settings" parent="menu_tgm_configuration" action="action_tgm_settings" sequence="10"/>
 </odoo>

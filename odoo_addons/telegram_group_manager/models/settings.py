@@ -14,8 +14,16 @@ class ResConfigSettings(models.TransientModel):
     _inherit = "res.config.settings"
 
     tgm_api_token = fields.Char(
-        related="company_id.tgm_api_token",
-        readonly=False,
         string="Telegram Manager API Token",
-        help="Bearer token required by /api/telegram/* endpoints for the selected company.",
+        compute="_compute_tgm_api_token",
+        inverse="_inverse_tgm_api_token",
+        help="Bearer token required by /api/telegram/* endpoints for the current company.",
     )
+
+    def _compute_tgm_api_token(self):
+        for rec in self:
+            rec.tgm_api_token = rec.env.company.sudo().tgm_api_token or False
+
+    def _inverse_tgm_api_token(self):
+        for rec in self:
+            rec.env.company.sudo().write({"tgm_api_token": rec.tgm_api_token or False})

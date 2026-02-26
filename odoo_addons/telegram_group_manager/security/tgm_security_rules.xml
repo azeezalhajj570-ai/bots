@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="rule_tgm_group_company" model="ir.rule">
+        <field name="name">Telegram Group company scope</field>
+        <field name="model_id" ref="model_tgm_group"/>
+        <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+    </record>
+
+    <record id="rule_tgm_group_setting_company" model="ir.rule">
+        <field name="name">Telegram Group Setting company scope</field>
+        <field name="model_id" ref="model_tgm_group_setting"/>
+        <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+    </record>
+
+    <record id="rule_tgm_rule_company" model="ir.rule">
+        <field name="name">Telegram Rule company scope</field>
+        <field name="model_id" ref="model_tgm_rule"/>
+        <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+    </record>
+
+    <record id="rule_tgm_route_company" model="ir.rule">
+        <field name="name">Telegram Route company scope</field>
+        <field name="model_id" ref="model_tgm_route"/>
+        <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+    </record>
+
+    <record id="rule_tgm_gate_company" model="ir.rule">
+        <field name="name">Telegram Gate company scope</field>
+        <field name="model_id" ref="model_tgm_gate"/>
+        <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+    </record>
+
+    <record id="rule_tgm_mod_log_company" model="ir.rule">
+        <field name="name">Telegram Moderation Log company scope</field>
+        <field name="model_id" ref="model_tgm_mod_log"/>
+        <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+    </record>
+
+    <record id="rule_tgm_action_event_company" model="ir.rule">
+        <field name="name">Telegram Action Event company scope</field>
+        <field name="model_id" ref="model_tgm_action_event"/>
+        <field name="domain_force">['|', ('company_id', '=', False), ('company_id', 'in', company_ids)]</field>
+        <field name="groups" eval="[(4, ref('base.group_user'))]"/>
+    </record>
+</odoo>

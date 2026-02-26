@@ -8,8 +8,8 @@
             <xpath expr="//form" position="inside">
                 <app data-string="Telegram Group Manager" string="Telegram Group Manager" name="telegram_group_manager">
                     <block title="API Security">
-                        <setting string="API Token" help="Bearer token used by the Telegram bot backend.">
-                            <field name="tgm_api_token" password="True" placeholder="Enter shared API token"/>
+                        <setting string="API Token" help="Bearer token used by the Telegram bot backend for current company.">
+                            <field name="tgm_api_token" password="True" placeholder="Enter company API token"/>
                         </setting>
                     </block>
                 </app>

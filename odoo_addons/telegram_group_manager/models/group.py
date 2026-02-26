@@ -17,11 +17,18 @@ DEFAULT_SETTINGS = {
 class TgmGroup(models.Model):
     _name = "tgm.group"
     _description = "Telegram Group"
+    _check_company_auto = True
 
     name = fields.Char(required=True)
     chat_id = fields.Integer(required=True, index=True)
     username = fields.Char()
     active = fields.Boolean(default=True)
+    company_id = fields.Many2one(
+        "res.company",
+        required=True,
+        index=True,
+        default=lambda self: self.env.company,
+    )
 
     setting_ids = fields.One2many("tgm.group.setting", "group_id", string="Settings")
     rule_ids = fields.One2many("tgm.rule", "group_id", string="Rules")
@@ -29,22 +36,35 @@ class TgmGroup(models.Model):
     gate_ids = fields.One2many("tgm.gate", "group_id", string="Gates")
 
     _sql_constraints = [
-        ("tgm_group_chat_id_uniq", "unique(chat_id)", "Chat ID must be unique."),
+        ("tgm_group_chat_company_uniq", "unique(chat_id, company_id)", "Chat ID must be unique per company."),
     ]
 
     @api.model
-    def ensure_group(self, chat_id: int) -> "TgmGroup":
-        group = self.search([("chat_id", "=", chat_id)], limit=1)
+    def ensure_group(self, chat_id: int, company_id: int | None = None) -> "TgmGroup":
+        target_company_id = company_id or self.env.company.id
+        group = self.search(
+            [("chat_id", "=", chat_id), ("company_id", "=", target_company_id)],
+            limit=1,
+        )
         if group:
             return group
-        return self.create({"name": str(chat_id), "chat_id": chat_id})
+        legacy_group = self.search(
+            [("chat_id", "=", chat_id), ("company_id", "=", False)],
+            limit=1,
+        )
+        if legacy_group:
+            legacy_group.write({"company_id": target_company_id})
+            return legacy_group
+        return self.create({"name": str(chat_id), "chat_id": chat_id, "company_id": target_company_id})
 
 
 class TgmGroupSetting(models.Model):
     _name = "tgm.group.setting"
     _description = "Telegram Group Setting"
+    _check_company_auto = True
 
     group_id = fields.Many2one("tgm.group", required=True, ondelete="cascade", index=True)
+    company_id = fields.Many2one("res.company", related="group_id.company_id", store=True, index=True, readonly=True)
     feature_key = fields.Char(required=True, index=True)
     enabled = fields.Boolean(default=True)
     config_json = fields.Text(default="{}")
@@ -76,8 +96,10 @@ class TgmRule(models.Model):
     _name = "tgm.rule"
     _description = "Telegram Dynamic Remove Rule"
     _order = "id asc"
+    _check_company_auto = True
 
     group_id = fields.Many2one("tgm.group", required=True, ondelete="cascade", index=True)
+    company_id = fields.Many2one("res.company", related="group_id.company_id", store=True, index=True, readonly=True)
     pattern = fields.Char(required=True)
     enabled = fields.Boolean(default=True)
 
@@ -86,8 +108,10 @@ class TgmRoute(models.Model):
     _name = "tgm.route"
     _description = "Telegram Link Route"
     _order = "keyword asc"
+    _check_company_auto = True
 
     group_id = fields.Many2one("tgm.group", required=True, ondelete="cascade", index=True)
+    company_id = fields.Many2one("res.company", related="group_id.company_id", store=True, index=True, readonly=True)
     keyword = fields.Char(required=True)
     destination = fields.Char(required=True)
     gate_group_id = fields.Integer()
@@ -102,8 +126,10 @@ class TgmGate(models.Model):
     _name = "tgm.gate"
     _description = "Telegram Participation Gate"
     _order = "gate_title asc"
+    _check_company_auto = True
 
     group_id = fields.Many2one("tgm.group", required=True, ondelete="cascade", index=True)
+    company_id = fields.Many2one("res.company", related="group_id.company_id", store=True, index=True, readonly=True)
     gate_group_id = fields.Integer(required=True)
     gate_title = fields.Char(required=True)
     join_url = fields.Char(required=True)
@@ -118,8 +144,15 @@ class TgmModLog(models.Model):
     _name = "tgm.mod.log"
     _description = "Telegram Moderation Log"
     _order = "create_date desc"
+    _check_company_auto = True
 
     group_id = fields.Many2one("tgm.group", ondelete="set null", index=True)
+    company_id = fields.Many2one(
+        "res.company",
+        required=True,
+        index=True,
+        default=lambda self: self.env.company,
+    )
     chat_id = fields.Integer(index=True)
     action = fields.Char(required=True)
     reason = fields.Char()
@@ -131,8 +164,15 @@ class TgmActionEvent(models.Model):
     _name = "tgm.action.event"
     _description = "Telegram Action Event"
     _order = "create_date desc"
+    _check_company_auto = True
 
     group_id = fields.Many2one("tgm.group", ondelete="set null", index=True)
+    company_id = fields.Many2one(
+        "res.company",
+        required=True,
+        index=True,
+        default=lambda self: self.env.company,
+    )
     chat_id = fields.Integer(index=True)
     event_name = fields.Char(required=True)
     payload_json = fields.Text(default="{}")

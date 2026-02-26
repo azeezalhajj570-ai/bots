@@ -8,6 +8,7 @@
                 <field name="name"/>
                 <field name="chat_id"/>
                 <field name="username"/>
+                <field name="company_id" groups="base.group_multi_company"/>
                 <field name="active"/>
             </list>
         </field>
@@ -23,6 +24,7 @@
                         <field name="name"/>
                         <field name="chat_id"/>
                         <field name="username"/>
+                        <field name="company_id" groups="base.group_multi_company"/>
                         <field name="active"/>
                     </group>
                     <notebook>

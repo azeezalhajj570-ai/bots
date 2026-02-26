@@ -11,18 +11,19 @@ This addon provides:
 2. Update apps list.
 3. Install module: `Telegram Group Manager`.
 
-## API Auth
+## API Auth (Per Company)
 
-Set a shared bearer token in Odoo:
+Set bearer token per company in Odoo:
 
+- Switch to target company
 - Telegram Bot Manager -> Settings -> API Token
-- (Stored as system parameter `telegram_group_manager.api_token`)
 
 Then set bot env:
 - `ODOO_API_BASE_URL=https://your-odoo-host`
-- `ODOO_API_TOKEN=<same token>`
+- `ODOO_API_TOKEN=<token of that company>`
 
-If system parameter is empty, API is open (for local dev only).
+Requests are scoped to the company matched by bearer token.
+If no company has a token configured, API falls back to current Odoo company (local/dev behavior).
 
 ## Endpoints
 

@@ -33,7 +33,7 @@ class TelegramGroupManagerApi(http.Controller):
         return None, self._response({"ok": False, "error": "unauthorized"}, status=401)
 
     def _group_by_chat_id(self, chat_id: int, company_id: int):
-        return request.env["tgm.group"].sudo().ensure_group(chat_id, company_id=company_id)
+        return request.env["tgm.group"].sudo().ensure_group(str(chat_id), company_id=company_id)
 
     @http.route("/api/telegram/groups", type="http", auth="none", methods=["GET"], csrf=False)
     def get_groups(self, **kwargs):
@@ -173,7 +173,7 @@ class TelegramGroupManagerApi(http.Controller):
         route = route_model.search([("group_id", "=", group.id), ("keyword", "=", keyword)], limit=1)
         values = {
             "destination": destination,
-            "gate_group_id": int(payload["gate_group_id"]) if payload.get("gate_group_id") is not None else False,
+            "gate_group_id": str(payload["gate_group_id"]).strip() if payload.get("gate_group_id") is not None else False,
             "enabled": bool(payload.get("enabled", True)),
         }
         if route:
@@ -215,11 +215,12 @@ class TelegramGroupManagerApi(http.Controller):
         join_url = str(payload.get("join_url", "")).strip()
         if gate_group_id is None or not join_url:
             return self._response({"ok": False, "error": "gate_group_id_join_url_required"}, status=400)
-        gate_title = str(payload.get("gate_title", "")).strip() or str(gate_group_id)
+        gate_group_id_key = str(gate_group_id).strip()
+        gate_title = str(payload.get("gate_title", "")).strip() or gate_group_id_key
         group = self._group_by_chat_id(chat_id, company.id)
         gate_model = request.env["tgm.gate"].sudo()
         gate = gate_model.search(
-            [("group_id", "=", group.id), ("gate_group_id", "=", int(gate_group_id))],
+            [("group_id", "=", group.id), ("gate_group_id", "=", gate_group_id_key)],
             limit=1,
         )
         values = {
@@ -230,7 +231,7 @@ class TelegramGroupManagerApi(http.Controller):
         if gate:
             gate.write(values)
         else:
-            values.update({"group_id": group.id, "gate_group_id": int(gate_group_id)})
+            values.update({"group_id": group.id, "gate_group_id": gate_group_id_key})
             gate = gate_model.create(values)
         return self._response({"ok": True, "gate_group_id": gate.gate_group_id})
 
@@ -247,7 +248,7 @@ class TelegramGroupManagerApi(http.Controller):
             return unauthorized
         group = self._group_by_chat_id(chat_id, company.id)
         gate = request.env["tgm.gate"].sudo().search(
-            [("group_id", "=", group.id), ("gate_group_id", "=", gate_group_id)],
+            [("group_id", "=", group.id), ("gate_group_id", "=", str(gate_group_id))],
             limit=1,
         )
         if not gate:
@@ -261,23 +262,23 @@ class TelegramGroupManagerApi(http.Controller):
         if unauthorized:
             return unauthorized
         payload = self._parse_payload()
-        chat_id = int(payload.get("chat_id") or 0)
+        raw_chat_id = str(payload.get("chat_id") or "").strip()
         group = (
             request.env["tgm.group"].sudo().search(
-                [("chat_id", "=", chat_id), ("company_id", "=", company.id)],
+                [("chat_id", "=", raw_chat_id), ("company_id", "=", company.id)],
                 limit=1,
             )
-            if chat_id
+            if raw_chat_id
             else False
         )
         request.env["tgm.mod.log"].sudo().create(
             {
                 "group_id": group.id if group else False,
                 "company_id": company.id,
-                "chat_id": chat_id or False,
+                "chat_id": raw_chat_id or False,
                 "action": str(payload.get("action", "")).strip() or "unknown",
                 "reason": str(payload.get("reason", "")).strip(),
-                "user_id": int(payload.get("user_id")) if payload.get("user_id") is not None else False,
+                "user_id": str(payload.get("user_id")).strip() if payload.get("user_id") is not None else False,
                 "meta_json": json.dumps(payload.get("meta", {}), ensure_ascii=False),
             }
         )
@@ -289,20 +290,20 @@ class TelegramGroupManagerApi(http.Controller):
         if unauthorized:
             return unauthorized
         payload = self._parse_payload()
-        chat_id = int(payload.get("chat_id") or 0)
+        raw_chat_id = str(payload.get("chat_id") or "").strip()
         group = (
             request.env["tgm.group"].sudo().search(
-                [("chat_id", "=", chat_id), ("company_id", "=", company.id)],
+                [("chat_id", "=", raw_chat_id), ("company_id", "=", company.id)],
                 limit=1,
             )
-            if chat_id
+            if raw_chat_id
             else False
         )
         request.env["tgm.action.event"].sudo().create(
             {
                 "group_id": group.id if group else False,
                 "company_id": company.id,
-                "chat_id": chat_id or False,
+                "chat_id": raw_chat_id or False,
                 "event_name": str(payload.get("event_name", "")).strip() or "unknown",
                 "payload_json": json.dumps(payload.get("payload", {}), ensure_ascii=False),
             }

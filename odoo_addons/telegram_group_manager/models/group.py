@@ -20,7 +20,7 @@ class TgmGroup(models.Model):
     _check_company_auto = True
 
     name = fields.Char(required=True)
-    chat_id = fields.Integer(required=True, index=True)
+    chat_id = fields.Char(required=True, index=True)
     username = fields.Char()
     active = fields.Boolean(default=True)
     company_id = fields.Many2one(
@@ -41,21 +41,22 @@ class TgmGroup(models.Model):
 
     @api.model
     def ensure_group(self, chat_id: int, company_id: int | None = None) -> "TgmGroup":
+        chat_key = str(chat_id).strip()
         target_company_id = company_id or self.env.company.id
         group = self.search(
-            [("chat_id", "=", chat_id), ("company_id", "=", target_company_id)],
+            [("chat_id", "=", chat_key), ("company_id", "=", target_company_id)],
             limit=1,
         )
         if group:
             return group
         legacy_group = self.search(
-            [("chat_id", "=", chat_id), ("company_id", "=", False)],
+            [("chat_id", "=", chat_key), ("company_id", "=", False)],
             limit=1,
         )
         if legacy_group:
             legacy_group.write({"company_id": target_company_id})
             return legacy_group
-        return self.create({"name": str(chat_id), "chat_id": chat_id, "company_id": target_company_id})
+        return self.create({"name": chat_key, "chat_id": chat_key, "company_id": target_company_id})
 
 
 class TgmGroupSetting(models.Model):
@@ -114,7 +115,7 @@ class TgmRoute(models.Model):
     company_id = fields.Many2one("res.company", related="group_id.company_id", store=True, index=True, readonly=True)
     keyword = fields.Char(required=True)
     destination = fields.Char(required=True)
-    gate_group_id = fields.Integer()
+    gate_group_id = fields.Char()
     enabled = fields.Boolean(default=True)
 
     _sql_constraints = [
@@ -130,7 +131,7 @@ class TgmGate(models.Model):
 
     group_id = fields.Many2one("tgm.group", required=True, ondelete="cascade", index=True)
     company_id = fields.Many2one("res.company", related="group_id.company_id", store=True, index=True, readonly=True)
-    gate_group_id = fields.Integer(required=True)
+    gate_group_id = fields.Char(required=True)
     gate_title = fields.Char(required=True)
     join_url = fields.Char(required=True)
     enabled = fields.Boolean(default=True)
@@ -153,10 +154,10 @@ class TgmModLog(models.Model):
         index=True,
         default=lambda self: self.env.company,
     )
-    chat_id = fields.Integer(index=True)
+    chat_id = fields.Char(index=True)
     action = fields.Char(required=True)
     reason = fields.Char()
-    user_id = fields.Integer()
+    user_id = fields.Char()
     meta_json = fields.Text(default="{}")
 
 
@@ -173,6 +174,6 @@ class TgmActionEvent(models.Model):
         index=True,
         default=lambda self: self.env.company,
     )
-    chat_id = fields.Integer(index=True)
+    chat_id = fields.Char(index=True)
     event_name = fields.Char(required=True)
     payload_json = fields.Text(default="{}")

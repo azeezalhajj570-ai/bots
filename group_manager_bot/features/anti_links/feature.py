@@ -6,8 +6,8 @@ from typing import Any
 from telegram import Update
 from telegram.ext import ContextTypes
 
+from ...config_provider import ConfigProvider
 from ...config import Config
-from ...storage import BotRepository
 from ...telegram_helpers import is_admin, is_group_chat
 from ...core.decisions import Decision
 
@@ -17,9 +17,9 @@ log = logging.getLogger(__name__)
 class AntiLinksFeature:
     key = "anti_links"
 
-    def __init__(self, cfg: Config, db: BotRepository) -> None:
+    def __init__(self, cfg: Config, provider: ConfigProvider) -> None:
         self.cfg = cfg
-        self.db = db
+        self.provider = provider
 
     async def collect(self, update: Update, context: ContextTypes.DEFAULT_TYPE, bag: dict[str, Any]) -> None:
         msg = update.message
@@ -35,7 +35,7 @@ class AntiLinksFeature:
             return
 
         chat_id = chat.id
-        if not self.cfg.test_mode and not self.db.get_setting(chat_id, "anti_links"):
+        if not self.cfg.test_mode and not await self.provider.get_setting(chat_id, "anti_links"):
             return
         if not self.cfg.test_mode and text.startswith("/"):
             return

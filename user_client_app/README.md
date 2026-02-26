@@ -23,6 +23,7 @@ API_ID=123456
 API_HASH=YOUR_API_HASH
 PHONE_NUMBER=+15551234567
 SESSION_NAME=user_client
+JOIN_LINKS=https://t.me/example_group,https://t.me/+InviteToken
 ```
 
 Get `API_ID` and `API_HASH` from: https://my.telegram.org
@@ -45,6 +46,7 @@ python user_client_app/pyrogram_user_client.py
 
 - First run performs login flow in terminal.
 - Also creates local session file.
+- If `JOIN_LINKS` is set, app tries to join those groups/channels at startup.
 
 ## Notes
 

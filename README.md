@@ -37,11 +37,17 @@ MUTE_SECONDS=3600
 LOG_LEVEL=INFO
 LOG_DIR=logs
 TEST_MODE=0
+ODOO_API_BASE_URL=
+ODOO_API_TOKEN=
+ODOO_API_TIMEOUT_SECONDS=10
+ODOO_CACHE_TTL_SECONDS=30
 ```
 
 Notes:
 - `MUTE_SECONDS` is the exact mute duration.
 - `TEST_MODE=1` enables strict test behavior globally.
+- Set `ODOO_API_BASE_URL` and `ODOO_API_TOKEN` to enable external Odoo API integration (scaffolded client).
+- `ODOO_CACHE_TTL_SECONDS` controls settings/rules/routes/gates cache duration for Odoo API reads.
 
 ## Run
 
@@ -114,6 +120,31 @@ If a message is sent as anonymous admin identity (`sender_chat`, often shown lik
   - `002_outbox.sql`
   - `003_indexes.sql`
   - `004_dynamic_rules_and_routes.sql`
+  - `005_warn_delivery.sql`
+  - `006_warn_group_delivery.sql`
+  - `007_participation_gates.sql`
+
+## Odoo API (Scaffold)
+
+- Client module: `group_manager_bot/integrations/odoo_api_client.py`
+- Runtime provider with cache + DB fallback: `group_manager_bot/config_provider.py`
+- Odoo addon scaffold: `odoo_addons/telegram_group_manager/`
+- Implemented endpoint methods:
+  - `GET /api/telegram/groups`
+  - `GET /api/telegram/groups/{chat_id}/settings`
+  - `GET /api/telegram/groups/{chat_id}/rules`
+  - `GET /api/telegram/groups/{chat_id}/routes`
+  - `GET /api/telegram/groups/{chat_id}/gates`
+  - `POST /api/telegram/logs/mod`
+  - `POST /api/telegram/events/action`
+  - `POST /api/telegram/groups/{chat_id}/rules`
+  - `DELETE /api/telegram/groups/{chat_id}/rules/{rule_id}`
+  - `POST /api/telegram/groups/{chat_id}/routes`
+  - `DELETE /api/telegram/groups/{chat_id}/routes/{keyword}`
+  - `POST /api/telegram/groups/{chat_id}/gates`
+  - `DELETE /api/telegram/groups/{chat_id}/gates/{gate_group_id}`
+
+Write sync hooks are enabled for `/addrule`, `/delrule`, `/addroute`, `/delroute`, `/addgate`, `/delgate` (best-effort; local DB still succeeds if API fails).
 
 ## Project Entry
 

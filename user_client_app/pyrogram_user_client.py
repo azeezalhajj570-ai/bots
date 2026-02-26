@@ -4,6 +4,7 @@ import logging
 import os
 from pathlib import Path
 import time
+from typing import List
 
 from dotenv import load_dotenv
 from pyrogram import Client, filters, idle
@@ -29,6 +30,22 @@ def _setup_logging() -> logging.Logger:
     return logger
 
 
+def _parse_join_links(raw: str) -> List[str]:
+    if not raw.strip():
+        return []
+    normalized = raw.replace("\n", ",").replace(" ", ",")
+    items = [item.strip() for item in normalized.split(",") if item.strip()]
+    seen: set[str] = set()
+    result: List[str] = []
+    for item in items:
+        key = item.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(item)
+    return result
+
+
 def _require_env(name: str) -> str:
     value = os.getenv(name, "").strip()
     if not value:
@@ -46,6 +63,7 @@ def main() -> None:
     auto_reply_user_id = int(os.getenv("AUTO_REPLY_USER_ID", "6983225318"))
     auto_reply_text = os.getenv("AUTO_REPLY_TEXT", "هلا والله")
     auto_reply_cooldown = int(os.getenv("AUTO_REPLY_COOLDOWN_SECONDS", "8"))
+    join_links = _parse_join_links(os.getenv("JOIN_LINKS", ""))
     last_reply_at: dict[tuple[int, int], float] = {}
 
     with Client(session_name, api_id=api_id, api_hash=api_hash) as app:
@@ -86,6 +104,12 @@ def main() -> None:
 
         me = app.get_me()
         print(f"Logged in as: {me.first_name} (@{me.username}) id={me.id}")
+        for link in join_links:
+            try:
+                app.join_chat(link)
+                log.info("joined chat from link=%s", link)
+            except Exception as exc:
+                log.warning("join failed link=%s error=%s", link, exc)
         print("User client is running and logging group messages. Press Ctrl+C to stop.")
         idle()
 

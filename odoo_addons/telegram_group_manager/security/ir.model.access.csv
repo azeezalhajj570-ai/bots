@@ -1,0 +1,8 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_tgm_group,tgm.group,model_tgm_group,base.group_user,1,1,1,1
+access_tgm_group_setting,tgm.group.setting,model_tgm_group_setting,base.group_user,1,1,1,1
+access_tgm_rule,tgm.rule,model_tgm_rule,base.group_user,1,1,1,1
+access_tgm_route,tgm.route,model_tgm_route,base.group_user,1,1,1,1
+access_tgm_gate,tgm.gate,model_tgm_gate,base.group_user,1,1,1,1
+access_tgm_mod_log,tgm.mod.log,model_tgm_mod_log,base.group_user,1,0,0,0
+access_tgm_action_event,tgm.action.event,model_tgm_action_event,base.group_user,1,0,0,0

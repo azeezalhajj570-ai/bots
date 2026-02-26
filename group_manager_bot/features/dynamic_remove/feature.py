@@ -7,9 +7,9 @@ from typing import Any
 from telegram import Update
 from telegram.ext import ContextTypes
 
+from ...config_provider import ConfigProvider
 from ...config import Config
 from ...core.decisions import Decision
-from ...storage import BotRepository
 from ...telegram_helpers import is_admin, is_group_chat
 
 log = logging.getLogger(__name__)
@@ -18,9 +18,9 @@ log = logging.getLogger(__name__)
 class DynamicRemoveFeature:
     key = "dynamic_remove"
 
-    def __init__(self, cfg: Config, db: BotRepository) -> None:
+    def __init__(self, cfg: Config, provider: ConfigProvider) -> None:
         self.cfg = cfg
-        self.db = db
+        self.provider = provider
 
     async def collect(self, update: Update, context: ContextTypes.DEFAULT_TYPE, bag: dict[str, Any]) -> None:
         msg = update.message
@@ -39,7 +39,7 @@ class DynamicRemoveFeature:
         if not text:
             return
 
-        rules = self.db.list_dynamic_rules(chat.id)
+        rules = await self.provider.list_dynamic_rules(chat.id)
         for rule in rules:
             if not rule.enabled:
                 continue

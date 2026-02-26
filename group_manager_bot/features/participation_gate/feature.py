@@ -6,9 +6,9 @@ from typing import Any
 from telegram import Update
 from telegram.ext import ContextTypes
 
+from ...config_provider import ConfigProvider
 from ...config import Config
 from ...core.decisions import Decision
-from ...storage import BotRepository
 from ...telegram_helpers import is_admin, is_group_chat, is_member_of_chat
 
 log = logging.getLogger(__name__)
@@ -17,9 +17,9 @@ log = logging.getLogger(__name__)
 class ParticipationGateFeature:
     key = "participation_gate"
 
-    def __init__(self, cfg: Config, db: BotRepository) -> None:
+    def __init__(self, cfg: Config, provider: ConfigProvider) -> None:
         self.cfg = cfg
-        self.db = db
+        self.provider = provider
 
     async def collect(self, update: Update, context: ContextTypes.DEFAULT_TYPE, bag: dict[str, Any]) -> None:
         msg = update.message
@@ -36,7 +36,7 @@ class ParticipationGateFeature:
         if not self.cfg.test_mode and await is_admin(context, chat.id, user.id):
             return
 
-        gates = [gate for gate in self.db.list_participation_gates(chat.id) if gate.enabled]
+        gates = [gate for gate in await self.provider.list_participation_gates(chat.id) if gate.enabled]
         if not gates:
             return
 

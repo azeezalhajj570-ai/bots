@@ -5,16 +5,16 @@ from typing import Any
 from telegram import Update
 from telegram.ext import ContextTypes
 
+from ...config_provider import ConfigProvider
 from ...core.decisions import Decision
-from ...storage import BotRepository
 from ...telegram_helpers import is_admin, is_group_chat, is_member_of_chat
 
 
 class LinkRoutesFeature:
     key = "link_routes"
 
-    def __init__(self, db: BotRepository) -> None:
-        self.db = db
+    def __init__(self, provider: ConfigProvider) -> None:
+        self.provider = provider
 
     async def collect(self, update: Update, context: ContextTypes.DEFAULT_TYPE, bag: dict[str, Any]) -> None:
         msg = update.message
@@ -29,7 +29,7 @@ class LinkRoutesFeature:
         if not text or text.startswith("/"):
             return
 
-        routes = self.db.list_link_routes(chat.id)
+        routes = await self.provider.list_link_routes(chat.id)
         if not routes:
             return
 

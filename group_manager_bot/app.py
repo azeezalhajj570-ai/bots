@@ -14,6 +14,7 @@ from telegram.ext import (
 
 from .cache import Cache
 from .config import Config
+from .config_provider import ConfigProvider
 from .core.executor import Executor
 from .core.router import Router
 from .features.anti_bots.feature import AntiBotsFeature
@@ -39,6 +40,7 @@ from .handlers.commands import (
     start_cmd,
 )
 from .handlers.hide_system import make_hide_system_handler
+from .integrations.odoo_api_client import OdooApiClient
 from .storage import BotRepository
 
 log = logging.getLogger(__name__)
@@ -78,13 +80,24 @@ def build_app(cfg: Config, db: BotRepository, cache: Cache) -> Application:
 
     app = Application.builder().token(cfg.bot_token).post_init(_post_init).build()
     app.bot_data["cache"] = cache
+    odoo_client = None
+    if cfg.odoo_api_base_url and cfg.odoo_api_token:
+        odoo_client = OdooApiClient(
+            base_url=cfg.odoo_api_base_url,
+            token=cfg.odoo_api_token,
+            timeout_seconds=cfg.odoo_api_timeout_seconds,
+        )
+        log.info("Odoo API integration enabled base_url=%s", cfg.odoo_api_base_url)
+    app.bot_data["odoo_client"] = odoo_client
+    provider = ConfigProvider(db=db, cache=cache, odoo_client=odoo_client, ttl_seconds=cfg.odoo_cache_ttl_seconds)
+    app.bot_data["config_provider"] = provider
     app.bot_data["router"] = Router(
         features=[
             AntiBotsFeature(db),
-            ParticipationGateFeature(cfg, db),
-            DynamicRemoveFeature(cfg, db),
-            LinkRoutesFeature(db),
-            AntiLinksFeature(cfg, db),
+            ParticipationGateFeature(cfg, provider),
+            DynamicRemoveFeature(cfg, provider),
+            LinkRoutesFeature(provider),
+            AntiLinksFeature(cfg, provider),
         ],
         executor=Executor(db),
     )

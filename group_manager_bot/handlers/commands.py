@@ -6,11 +6,20 @@ import re
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
+from ..integrations.odoo_api_client import OdooApiClient
 from ..keyboards import build_settings_keyboard, settings_text
 from ..storage import BotRepository
 from ..telegram_helpers import is_admin, is_group_chat
 
 log = logging.getLogger(__name__)
+
+
+def _get_odoo_client(context: ContextTypes.DEFAULT_TYPE) -> OdooApiClient | None:
+    app = getattr(context, "application", None)
+    if not app:
+        return None
+    client = app.bot_data.get("odoo_client")
+    return client if isinstance(client, OdooApiClient) else None
 
 
 async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -269,6 +278,12 @@ def make_private_settings_input_handler(db: BotRepository):
                     chat_id = int(route_wizard["chat_id"])
                     keyword = str(route_wizard["keyword"])
                     db.upsert_link_route(chat_id, keyword, destination, None)
+                    odoo_client = _get_odoo_client(context)
+                    if odoo_client:
+                        try:
+                            await odoo_client.upsert_route(chat_id, keyword, destination, None, True)
+                        except Exception as exc:
+                            log.warning("Odoo sync failed for addroute wizard chat=%s keyword=%s error=%s", chat_id, keyword, exc)
                     context.user_data.pop("addroute_wizard", None)
                     await update.message.reply_text(
                         f"Route saved for chat `{chat_id}`:\n`{keyword}` -> {destination}",
@@ -350,6 +365,12 @@ def make_addrule_cmd(db: BotRepository):
             return
         pattern = " ".join(cmd_args).strip()
         rule_id = db.add_dynamic_rule(chat_id, pattern)
+        odoo_client = _get_odoo_client(context)
+        if odoo_client:
+            try:
+                await odoo_client.upsert_rule(chat_id, rule_id, pattern, True)
+            except Exception as exc:
+                log.warning("Odoo sync failed for addrule chat=%s rule=%s error=%s", chat_id, rule_id, exc)
         await update.message.reply_text(f"Rule added for chat `{chat_id}`. id={rule_id}", parse_mode="Markdown")
 
     return addrule_cmd
@@ -377,6 +398,13 @@ def make_delrule_cmd(db: BotRepository):
             await update.message.reply_text("Rule id must be a number.")
             return
         deleted = db.delete_dynamic_rule(chat_id, rule_id)
+        if deleted:
+            odoo_client = _get_odoo_client(context)
+            if odoo_client:
+                try:
+                    await odoo_client.delete_rule(chat_id, rule_id)
+                except Exception as exc:
+                    log.warning("Odoo sync failed for delrule chat=%s rule=%s error=%s", chat_id, rule_id, exc)
         await update.message.reply_text("Rule deleted." if deleted else "Rule not found.")
 
     return delrule_cmd
@@ -439,6 +467,12 @@ def make_addroute_cmd(db: BotRepository):
                 await update.message.reply_text("gate_group_id must be a number.")
                 return
         db.upsert_link_route(chat_id, keyword, destination, gate_group_id)
+        odoo_client = _get_odoo_client(context)
+        if odoo_client:
+            try:
+                await odoo_client.upsert_route(chat_id, keyword, destination, gate_group_id, True)
+            except Exception as exc:
+                log.warning("Odoo sync failed for addroute chat=%s keyword=%s error=%s", chat_id, keyword, exc)
         await update.message.reply_text(f"Route saved for chat `{chat_id}`.", parse_mode="Markdown")
 
     return addroute_cmd
@@ -460,7 +494,15 @@ def make_delroute_cmd(db: BotRepository):
         if not cmd_args:
             await update.message.reply_text("Missing keyword.")
             return
-        deleted = db.delete_link_route(chat_id, cmd_args[0])
+        keyword = cmd_args[0]
+        deleted = db.delete_link_route(chat_id, keyword)
+        if deleted:
+            odoo_client = _get_odoo_client(context)
+            if odoo_client:
+                try:
+                    await odoo_client.delete_route(chat_id, keyword)
+                except Exception as exc:
+                    log.warning("Odoo sync failed for delroute chat=%s keyword=%s error=%s", chat_id, keyword, exc)
         await update.message.reply_text("Route deleted." if deleted else "Route not found.")
 
     return delroute_cmd
@@ -521,6 +563,12 @@ def make_addgate_cmd(db: BotRepository):
             return
 
         db.upsert_participation_gate(chat_id, gate_group_id, gate_title, join_url)
+        odoo_client = _get_odoo_client(context)
+        if odoo_client:
+            try:
+                await odoo_client.upsert_gate(chat_id, gate_group_id, gate_title, join_url, True)
+            except Exception as exc:
+                log.warning("Odoo sync failed for addgate chat=%s gate=%s error=%s", chat_id, gate_group_id, exc)
         await update.message.reply_text(f"Gate added for chat `{chat_id}` -> {gate_title}", parse_mode="Markdown")
 
     return addgate_cmd
@@ -548,6 +596,13 @@ def make_delgate_cmd(db: BotRepository):
             await update.message.reply_text("gate_group_id must be a number.")
             return
         deleted = db.delete_participation_gate(chat_id, gate_group_id)
+        if deleted:
+            odoo_client = _get_odoo_client(context)
+            if odoo_client:
+                try:
+                    await odoo_client.delete_gate(chat_id, gate_group_id)
+                except Exception as exc:
+                    log.warning("Odoo sync failed for delgate chat=%s gate=%s error=%s", chat_id, gate_group_id, exc)
         await update.message.reply_text("Gate deleted." if deleted else "Gate not found.")
 
     return delgate_cmd

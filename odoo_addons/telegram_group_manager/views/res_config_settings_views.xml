@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_tgm" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.telegram.group.manager</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app data-string="Telegram Group Manager" string="Telegram Group Manager" name="telegram_group_manager">
+                    <block title="API Security">
+                        <setting string="API Token" help="Bearer token used by the Telegram bot backend.">
+                            <field name="tgm_api_token" password="True" placeholder="Enter shared API token"/>
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="action_tgm_settings" model="ir.actions.act_window">
+        <field name="name">Settings</field>
+        <field name="res_model">res.config.settings</field>
+        <field name="view_mode">form</field>
+        <field name="target">current</field>
+        <field name="context">{'module_telegram_group_manager': 1}</field>
+    </record>
+</odoo>

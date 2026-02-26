@@ -1,0 +1,16 @@
+{
+    "name": "Telegram Group Manager",
+    "version": "16.0.1.0.0",
+    "summary": "Bot configuration and API backend for Telegram group manager",
+    "author": "Local",
+    "license": "LGPL-3",
+    "depends": ["base"],
+    "data": [
+        "security/ir.model.access.csv",
+        "views/group_views.xml",
+        "views/res_config_settings_views.xml",
+        "views/menu.xml",
+    ],
+    "application": True,
+    "installable": True,
+}

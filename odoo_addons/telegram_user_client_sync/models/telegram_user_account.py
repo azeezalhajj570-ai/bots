@@ -61,6 +61,7 @@ class TelegramUserAccount(models.Model):
     auth_password = fields.Char(copy=False)
 
     phone_code_hash = fields.Char(copy=False)
+    login_session_string = fields.Text(copy=False)
     auth_expires_at = fields.Datetime(copy=False)
 
     last_error = fields.Text(copy=False)
@@ -131,12 +132,13 @@ class TelegramUserAccount(models.Model):
                 "auth_code": False,
                 "auth_password": False,
                 "phone_code_hash": False,
+                "login_session_string": False,
                 "auth_expires_at": False,
             }
         )
 
     @contextmanager
-    def _client(self) -> Iterator["Client"]:
+    def _client(self, use_login_session: bool = False) -> Iterator["Client"]:
         """
         Context manager to ensure connect/disconnect is always paired.
         Uses Pyrogram sync API.
@@ -146,11 +148,20 @@ class TelegramUserAccount(models.Model):
         self._validate_login_prereqs()
         self._ensure_event_loop()
 
-        client = Client(
-            name=self._session_name(),
-            api_id=int(self.api_id),
-            api_hash=self.api_hash,
-        )
+        if use_login_session and self.login_session_string:
+            client = Client(
+                name=f"{self._session_name()}_tmp",
+                api_id=int(self.api_id),
+                api_hash=self.api_hash,
+                session_string=self.login_session_string,
+                in_memory=True,
+            )
+        else:
+            client = Client(
+                name=self._session_name(),
+                api_id=int(self.api_id),
+                api_hash=self.api_hash,
+            )
 
         try:
             client.connect()
@@ -197,10 +208,12 @@ class TelegramUserAccount(models.Model):
                 with rec._client() as client:
                     phone = rec.phone_number.strip()
                     sent = client.send_code(phone)
+                    login_session_string = client.export_session_string()
 
                     rec.write(
                         {
                             "phone_code_hash": sent.phone_code_hash,
+                            "login_session_string": login_session_string,
                             "auth_state": "code_sent",
                             "auth_expires_at": fields.Datetime.to_string(rec._now_utc() + timedelta(minutes=10)),
                             "last_error": False,
@@ -218,6 +231,9 @@ class TelegramUserAccount(models.Model):
             rec._validate_login_prereqs()
 
             code = (rec.auth_code or "").strip()
+            numeric = "".join(ch for ch in code if ch.isdigit())
+            if numeric:
+                code = numeric
             if not code:
                 raise UserError(_("Enter the received code first."))
             if not rec.phone_code_hash:
@@ -227,7 +243,7 @@ class TelegramUserAccount(models.Model):
                 raise UserError(_("Code expired. Please send code again."))
 
             try:
-                with rec._client() as client:
+                with rec._client(use_login_session=True) as client:
                     client.sign_in(
                         phone_number=rec.phone_number.strip(),
                         phone_code_hash=rec.phone_code_hash,
@@ -242,6 +258,7 @@ class TelegramUserAccount(models.Model):
                             "auth_code": False,
                             "auth_password": False,
                             "phone_code_hash": False,
+                            "login_session_string": False,
                             "auth_expires_at": False,
                             "last_error": False,
                         }
@@ -261,6 +278,7 @@ class TelegramUserAccount(models.Model):
                         "auth_state": "draft",
                         "auth_code": False,
                         "phone_code_hash": False,
+                        "login_session_string": False,
                         "auth_expires_at": False,
                         "last_error": _("Code expired. Please click Send Code again."),
                     }
@@ -294,7 +312,7 @@ class TelegramUserAccount(models.Model):
                 raise UserError(_("Enter 2FA password first."))
 
             try:
-                with rec._client() as client:
+                with rec._client(use_login_session=True) as client:
                     client.check_password(password)
 
                     session_string = client.export_session_string()
@@ -305,6 +323,7 @@ class TelegramUserAccount(models.Model):
                             "auth_code": False,
                             "auth_password": False,
                             "phone_code_hash": False,
+                            "login_session_string": False,
                             "auth_expires_at": False,
                             "last_error": False,
                         }

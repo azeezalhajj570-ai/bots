@@ -82,10 +82,10 @@ ODOO_SYNC_SECONDS=30
 - Install Odoo addon from `odoo_addons/telegram_user_client_sync`
 - In Odoo, create record in `telegram.user.account`
   - set `account_ref`, `phone_number`, `api_id`, `api_hash`
-  - click **Send Code**
-  - enter code then click **Verify Code**
-  - if required, enter 2FA password then click **Verify Password**
-- This stores `session_string` in Odoo; user client loads it from Odoo automatically
+  - keep `manual_session_only = True`
+  - paste `session_string` from Flask in the account form
+  - click **Fetch Chats** to import your Telegram groups into Odoo
+- User client loads `session_string` from Odoo automatically
 - Then create routes in `telegram.auto.reply.route` linked to that account
 
 When Odoo mode is enabled:

@@ -9,6 +9,7 @@
                 <field name="account_ref"/>
                 <field name="phone_number"/>
                 <field name="auth_state"/>
+                <field name="last_chat_sync_at"/>
             </list>
         </field>
     </record>
@@ -23,6 +24,7 @@
                     <button name="action_resend_code" string="Resend Code" type="object" invisible="manual_session_only"/>
                     <button name="action_verify_code" string="Verify Code" type="object" invisible="manual_session_only"/>
                     <button name="action_verify_password" string="Verify Password" type="object" invisible="manual_session_only"/>
+                    <button name="action_fetch_chats" string="Fetch Chats" type="object" class="btn-primary"/>
                     <field name="auth_state" widget="statusbar" statusbar_visible="draft,code_sent,password_required,authorized,error"/>
                 </header>
                 <sheet>
@@ -48,6 +50,18 @@
                     <group>
                         <field name="session_string" widget="text"/>
                         <field name="last_error" readonly="1"/>
+                        <field name="last_chat_sync_at" readonly="1"/>
+                        <field name="last_chat_sync_error" readonly="1"/>
+                    </group>
+                    <group>
+                        <field name="chat_ids" nolabel="1">
+                            <list create="false" delete="false">
+                                <field name="title"/>
+                                <field name="chat_id"/>
+                                <field name="username"/>
+                                <field name="chat_type"/>
+                            </list>
+                        </field>
                     </group>
                 </sheet>
             </form>
@@ -69,6 +83,7 @@
                 <field name="account_id"/>
                 <field name="account_ref"/>
                 <field name="phone_number"/>
+                <field name="chat_ref_id"/>
                 <field name="chat_id"/>
                 <field name="keyword"/>
                 <field name="response"/>
@@ -87,6 +102,7 @@
                         <field name="account_id"/>
                         <field name="account_ref" readonly="1"/>
                         <field name="phone_number" readonly="1"/>
+                        <field name="chat_ref_id" domain="[('account_id', '=', account_id)]"/>
                         <field name="chat_id"/>
                         <field name="keyword"/>
                         <field name="response"/>

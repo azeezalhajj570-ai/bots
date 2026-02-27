@@ -69,7 +69,7 @@ class OdooApiClient:
             ("account_ref", "=", account_ref),
             ("phone_number", "=", phone_number),
             ("enabled", "=", True),
-            ("auth_state", "=", "authorized"),
+            ("session_string", "!=", False),
         ]
         fields = ["session_string"]
         rows = self._models.execute_kw(

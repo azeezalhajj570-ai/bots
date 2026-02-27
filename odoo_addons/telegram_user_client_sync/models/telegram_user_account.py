@@ -18,16 +18,19 @@ _PENDING_LOGIN_LOCK = threading.Lock()
 # Dependency guard: distinguish "not installed" from "installed but import failed"
 try:
     from pyrogram import Client
+    from pyrogram.enums import ChatType
     from pyrogram.errors import PhoneCodeExpired, PhoneCodeInvalid
     from pyrogram.errors import SessionPasswordNeeded
 except ImportError as e:  # genuinely missing
     Client = None  # type: ignore[assignment]
+    ChatType = None  # type: ignore[assignment]
     PhoneCodeExpired = Exception  # type: ignore[assignment]
     PhoneCodeInvalid = Exception  # type: ignore[assignment]
     SessionPasswordNeeded = Exception  # type: ignore[assignment]
     _logger.warning("Pyrogram is not installed (ImportError): %s", e)
 except Exception as e:  # installed but failing to load for some reason
     Client = None  # type: ignore[assignment]
+    ChatType = None  # type: ignore[assignment]
     PhoneCodeExpired = Exception  # type: ignore[assignment]
     PhoneCodeInvalid = Exception  # type: ignore[assignment]
     SessionPasswordNeeded = Exception  # type: ignore[assignment]
@@ -50,6 +53,9 @@ class TelegramUserAccount(models.Model):
         default=True,
         help="If enabled, login/2FA actions are disabled. Paste session_string manually (from Flask) instead.",
     )
+    chat_ids = fields.One2many("telegram.user.chat", "account_id")
+    last_chat_sync_at = fields.Datetime(copy=False)
+    last_chat_sync_error = fields.Text(copy=False)
     enabled = fields.Boolean(default=True, index=True)
 
     auth_state = fields.Selection(
@@ -110,6 +116,22 @@ class TelegramUserAccount(models.Model):
             name=self._session_name(),
             api_id=self._api_id_int(),
             api_hash=self.api_hash,
+        )
+
+    def _build_authorized_client(self) -> "Client":
+        self.ensure_one()
+        self._ensure_pyrogram()
+        self._validate_login_prereqs()
+        self._ensure_event_loop()
+        session = (self.session_string or "").strip()
+        if not session:
+            raise UserError(_("session_string is empty. Set it first (manual mode) or complete auth flow."))
+        return Client(
+            name=f"{self._session_name()}_authorized",
+            api_id=self._api_id_int(),
+            api_hash=self.api_hash,
+            session_string=session,
+            in_memory=True,
         )
 
     def _get_pending_client(self) -> "tuple[Client, asyncio.AbstractEventLoop] | None":
@@ -541,4 +563,46 @@ class TelegramUserAccount(models.Model):
             rec.write({"auth_state": "draft", "last_error": False})
             rec._clear_auth_fields()
             rec._disconnect_client(rec._pop_pending_client())
+        return True
+
+    def action_fetch_chats(self):
+        for rec in self:
+            client = rec._build_authorized_client()
+            try:
+                client.connect()
+                synced = []
+                for dialog in client.get_dialogs():
+                    chat = dialog.chat
+                    if not chat or ChatType is None:
+                        continue
+                    if chat.type not in (ChatType.GROUP, ChatType.SUPERGROUP):
+                        continue
+                    synced.append(
+                        {
+                            "account_id": rec.id,
+                            "chat_id": str(chat.id),
+                            "title": chat.title or str(chat.id),
+                            "username": chat.username or False,
+                            "chat_type": "supergroup" if chat.type == ChatType.SUPERGROUP else "group",
+                        }
+                    )
+
+                # Replace snapshot for this account.
+                rec.chat_ids.unlink()
+                if synced:
+                    self.env["telegram.user.chat"].create(synced)
+                rec.write(
+                    {
+                        "last_chat_sync_at": fields.Datetime.now(),
+                        "last_chat_sync_error": False,
+                    }
+                )
+            except Exception as exc:
+                rec.write({"last_chat_sync_error": rec._telegram_error_text(exc)})
+                rec._set_error(exc, "Failed to fetch chats")
+            finally:
+                try:
+                    client.disconnect()
+                except Exception:
+                    _logger.debug("Authorized client disconnect failed for record %s", rec.id, exc_info=True)
         return True

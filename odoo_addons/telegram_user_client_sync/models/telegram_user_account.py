@@ -228,12 +228,11 @@ class TelegramUserAccount(models.Model):
                 with rec._client() as client:
                     phone = rec._normalized_phone()
                     sent = client.send_code(phone)
-                    login_session_string = client.export_session_string()
 
                     rec.write(
                         {
                             "phone_code_hash": sent.phone_code_hash,
-                            "login_session_string": login_session_string,
+                            "login_session_string": False,
                             "auth_state": "code_sent",
                             "auth_expires_at": fields.Datetime.to_string(rec._now_utc() + timedelta(minutes=10)),
                             "last_error": False,

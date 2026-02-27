@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import contextmanager
 from datetime import datetime, timedelta
@@ -83,6 +84,15 @@ class TelegramUserAccount(models.Model):
         # Unique, stable per record
         return f"odoo_tg_login_{self.id}"
 
+    def _ensure_event_loop(self) -> None:
+        # Odoo request handlers may run in threads with no default asyncio loop.
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_closed():
+                asyncio.set_event_loop(asyncio.new_event_loop())
+        except RuntimeError:
+            asyncio.set_event_loop(asyncio.new_event_loop())
+
     def _validate_login_prereqs(self) -> None:
         self.ensure_one()
         if not self.enabled:
@@ -129,6 +139,7 @@ class TelegramUserAccount(models.Model):
         self.ensure_one()
         self._ensure_pyrogram()
         self._validate_login_prereqs()
+        self._ensure_event_loop()
 
         client = Client(
             name=self._session_name(),

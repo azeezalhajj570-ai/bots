@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
+import threading
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import Iterator, Optional
@@ -10,6 +12,8 @@ from odoo import api, fields, models, _
 from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
+_PENDING_LOGIN_CLIENTS: dict[int, "Client"] = {}
+_PENDING_LOGIN_LOCK = threading.Lock()
 
 # Dependency guard: distinguish "not installed" from "installed but import failed"
 try:
@@ -89,6 +93,50 @@ class TelegramUserAccount(models.Model):
         self.ensure_one()
         # Unique, stable per record
         return f"odoo_tg_login_{self.id}"
+
+    def _build_client(self) -> "Client":
+        self.ensure_one()
+        self._ensure_pyrogram()
+        self._validate_login_prereqs()
+        self._ensure_event_loop()
+        return Client(
+            name=self._session_name(),
+            api_id=self._api_id_int(),
+            api_hash=self.api_hash,
+        )
+
+    def _get_pending_client(self) -> "Client | None":
+        self.ensure_one()
+        with _PENDING_LOGIN_LOCK:
+            return _PENDING_LOGIN_CLIENTS.get(self.id)
+
+    def _set_pending_client(self, client: "Client") -> None:
+        self.ensure_one()
+        with _PENDING_LOGIN_LOCK:
+            old = _PENDING_LOGIN_CLIENTS.get(self.id)
+            _PENDING_LOGIN_CLIENTS[self.id] = client
+        if old and old is not client:
+            try:
+                old.disconnect()
+            except Exception:
+                _logger.debug("Old pending client disconnect failed for record %s", self.id, exc_info=True)
+        _logger.info("Set pending login client for record %s on pid=%s", self.id, os.getpid())
+
+    def _pop_pending_client(self) -> "Client | None":
+        self.ensure_one()
+        with _PENDING_LOGIN_LOCK:
+            client = _PENDING_LOGIN_CLIENTS.pop(self.id, None)
+        if client:
+            _logger.info("Popped pending login client for record %s on pid=%s", self.id, os.getpid())
+        return client
+
+    def _disconnect_client(self, client: "Client | None") -> None:
+        if not client:
+            return
+        try:
+            client.disconnect()
+        except Exception:
+            _logger.debug("Pending client disconnect failed", exc_info=True)
 
     def _ensure_event_loop(self) -> None:
         # Odoo request handlers may run in threads with no default asyncio loop.
@@ -233,20 +281,27 @@ class TelegramUserAccount(models.Model):
             )
 
             try:
-                with rec._client() as client:
-                    phone = rec._normalized_phone()
-                    sent = client.send_code(phone)
+                old = rec._pop_pending_client()
+                rec._disconnect_client(old)
 
-                    rec.write(
-                        {
-                            "phone_code_hash": sent.phone_code_hash,
-                            "login_session_string": False,
-                            "auth_state": "code_sent",
-                            "auth_expires_at": fields.Datetime.to_string(rec._now_utc() + timedelta(minutes=10)),
-                            "last_error": False,
-                        }
-                    )
+                client = rec._build_client()
+                client.connect()
+                phone = rec._normalized_phone()
+                sent = client.send_code(phone)
+                rec._set_pending_client(client)
+
+                rec.write(
+                    {
+                        "phone_code_hash": sent.phone_code_hash,
+                        "login_session_string": False,
+                        "auth_state": "code_sent",
+                        "auth_expires_at": fields.Datetime.to_string(rec._now_utc() + timedelta(minutes=10)),
+                        "last_error": False,
+                    }
+                )
+                _logger.info("Code sent for record %s on pid=%s", rec.id, os.getpid())
             except Exception as exc:
+                rec._disconnect_client(rec._pop_pending_client())
                 rec._set_error(exc, "Failed to send login code")
         return True
 
@@ -270,26 +325,49 @@ class TelegramUserAccount(models.Model):
                 raise UserError(_("Code expired. Please send code again."))
 
             try:
-                with rec._client(use_login_session=True) as client:
-                    client.sign_in(
-                        phone_number=rec._normalized_phone(),
-                        phone_code_hash=rec.phone_code_hash,
-                        phone_code=code,
-                    )
-
-                    session_string = client.export_session_string()
+                client = rec._get_pending_client()
+                if client is None:
                     rec.write(
                         {
-                            "session_string": session_string,
-                            "auth_state": "authorized",
+                            "auth_state": "draft",
                             "auth_code": False,
-                            "auth_password": False,
                             "phone_code_hash": False,
                             "login_session_string": False,
                             "auth_expires_at": False,
-                            "last_error": False,
+                            "last_error": _(
+                                "Pending login context not found (likely different Odoo worker/process). "
+                                "Click Send Code and Verify Code in the same worker/session."
+                            ),
                         }
                     )
+                    raise UserError(
+                        _(
+                            "Pending login context not found. "
+                            "This happens when Odoo uses multiple workers. "
+                            "Use a single worker for login flow, then retry Send Code."
+                        )
+                    )
+
+                client.sign_in(
+                    phone_number=rec._normalized_phone(),
+                    phone_code_hash=rec.phone_code_hash,
+                    phone_code=code,
+                )
+
+                session_string = client.export_session_string()
+                rec.write(
+                    {
+                        "session_string": session_string,
+                        "auth_state": "authorized",
+                        "auth_code": False,
+                        "auth_password": False,
+                        "phone_code_hash": False,
+                        "login_session_string": False,
+                        "auth_expires_at": False,
+                        "last_error": False,
+                    }
+                )
+                rec._disconnect_client(rec._pop_pending_client())
             except SessionPasswordNeeded:
                 # 2FA enabled
                 rec.write(
@@ -312,6 +390,7 @@ class TelegramUserAccount(models.Model):
                         "last_error": tg_error,
                     }
                 )
+                rec._disconnect_client(rec._pop_pending_client())
                 raise UserError(_("Telegram returned code expired. Check last_error and click Send Code again."))
             except PhoneCodeInvalid as exc:
                 tg_error = rec._telegram_error_text(exc)
@@ -325,6 +404,7 @@ class TelegramUserAccount(models.Model):
                 )
                 raise UserError(_("Telegram returned invalid code. Check last_error and enter latest code."))
             except Exception as exc:
+                rec._disconnect_client(rec._pop_pending_client())
                 rec._set_error(exc, "Failed to verify code")
         return True
 
@@ -343,23 +423,33 @@ class TelegramUserAccount(models.Model):
                 raise UserError(_("Enter 2FA password first."))
 
             try:
-                with rec._client(use_login_session=True) as client:
-                    client.check_password(password)
-
-                    session_string = client.export_session_string()
-                    rec.write(
-                        {
-                            "session_string": session_string,
-                            "auth_state": "authorized",
-                            "auth_code": False,
-                            "auth_password": False,
-                            "phone_code_hash": False,
-                            "login_session_string": False,
-                            "auth_expires_at": False,
-                            "last_error": False,
-                        }
+                client = rec._get_pending_client()
+                if client is None:
+                    raise UserError(
+                        _(
+                            "Pending login context not found. "
+                            "Click Send Code again, then Verify Code and Verify Password in the same worker/session."
+                        )
                     )
+
+                client.check_password(password)
+
+                session_string = client.export_session_string()
+                rec.write(
+                    {
+                        "session_string": session_string,
+                        "auth_state": "authorized",
+                        "auth_code": False,
+                        "auth_password": False,
+                        "phone_code_hash": False,
+                        "login_session_string": False,
+                        "auth_expires_at": False,
+                        "last_error": False,
+                    }
+                )
+                rec._disconnect_client(rec._pop_pending_client())
             except Exception as exc:
+                rec._disconnect_client(rec._pop_pending_client())
                 rec._set_error(exc, "Failed to verify password")
         return True
 
@@ -370,4 +460,5 @@ class TelegramUserAccount(models.Model):
         for rec in self:
             rec.write({"auth_state": "draft", "last_error": False})
             rec._clear_auth_fields()
+            rec._disconnect_client(rec._pop_pending_client())
         return True

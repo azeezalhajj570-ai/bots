@@ -12,7 +12,7 @@ from odoo import api, fields, models, _
 from odoo.exceptions import UserError
 
 _logger = logging.getLogger(__name__)
-_PENDING_LOGIN_CLIENTS: dict[int, "Client"] = {}
+_PENDING_LOGIN_CLIENTS: dict[int, tuple["Client", asyncio.AbstractEventLoop]] = {}
 _PENDING_LOGIN_LOCK = threading.Lock()
 
 # Dependency guard: distinguish "not installed" from "installed but import failed"
@@ -105,35 +105,37 @@ class TelegramUserAccount(models.Model):
             api_hash=self.api_hash,
         )
 
-    def _get_pending_client(self) -> "Client | None":
+    def _get_pending_client(self) -> "tuple[Client, asyncio.AbstractEventLoop] | None":
         self.ensure_one()
         with _PENDING_LOGIN_LOCK:
             return _PENDING_LOGIN_CLIENTS.get(self.id)
 
-    def _set_pending_client(self, client: "Client") -> None:
+    def _set_pending_client(self, client: "Client", loop: asyncio.AbstractEventLoop) -> None:
         self.ensure_one()
         with _PENDING_LOGIN_LOCK:
-            old = _PENDING_LOGIN_CLIENTS.get(self.id)
-            _PENDING_LOGIN_CLIENTS[self.id] = client
-        if old and old is not client:
+            old_pair = _PENDING_LOGIN_CLIENTS.get(self.id)
+            _PENDING_LOGIN_CLIENTS[self.id] = (client, loop)
+        if old_pair and old_pair[0] is not client:
             try:
-                old.disconnect()
+                old_pair[0].disconnect()
             except Exception:
                 _logger.debug("Old pending client disconnect failed for record %s", self.id, exc_info=True)
         _logger.info("Set pending login client for record %s on pid=%s", self.id, os.getpid())
 
-    def _pop_pending_client(self) -> "Client | None":
+    def _pop_pending_client(self) -> "tuple[Client, asyncio.AbstractEventLoop] | None":
         self.ensure_one()
         with _PENDING_LOGIN_LOCK:
-            client = _PENDING_LOGIN_CLIENTS.pop(self.id, None)
-        if client:
+            pair = _PENDING_LOGIN_CLIENTS.pop(self.id, None)
+        if pair:
             _logger.info("Popped pending login client for record %s on pid=%s", self.id, os.getpid())
-        return client
+        return pair
 
-    def _disconnect_client(self, client: "Client | None") -> None:
-        if not client:
+    def _disconnect_client(self, pair: "tuple[Client, asyncio.AbstractEventLoop] | None") -> None:
+        if not pair:
             return
+        client, loop = pair
         try:
+            asyncio.set_event_loop(loop)
             client.disconnect()
         except Exception:
             _logger.debug("Pending client disconnect failed", exc_info=True)
@@ -284,11 +286,13 @@ class TelegramUserAccount(models.Model):
                 old = rec._pop_pending_client()
                 rec._disconnect_client(old)
 
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
                 client = rec._build_client()
                 client.connect()
                 phone = rec._normalized_phone()
                 sent = client.send_code(phone)
-                rec._set_pending_client(client)
+                rec._set_pending_client(client, loop)
 
                 rec.write(
                     {
@@ -348,13 +352,15 @@ class TelegramUserAccount(models.Model):
                         )
                     )
 
-                client.sign_in(
+                pending_client, pending_loop = client
+                asyncio.set_event_loop(pending_loop)
+                pending_client.sign_in(
                     phone_number=rec._normalized_phone(),
                     phone_code_hash=rec.phone_code_hash,
                     phone_code=code,
                 )
 
-                session_string = client.export_session_string()
+                session_string = pending_client.export_session_string()
                 rec.write(
                     {
                         "session_string": session_string,
@@ -432,9 +438,11 @@ class TelegramUserAccount(models.Model):
                         )
                     )
 
-                client.check_password(password)
+                pending_client, pending_loop = client
+                asyncio.set_event_loop(pending_loop)
+                pending_client.check_password(password)
 
-                session_string = client.export_session_string()
+                session_string = pending_client.export_session_string()
                 rec.write(
                     {
                         "session_string": session_string,

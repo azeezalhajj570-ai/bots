@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_telegram_user_account_tree" model="ir.ui.view">
+        <field name="name">telegram.user.account.tree</field>
+        <field name="model">telegram.user.account</field>
+        <field name="arch" type="xml">
+            <tree string="Telegram Accounts">
+                <field name="enabled"/>
+                <field name="account_ref"/>
+                <field name="phone_number"/>
+                <field name="auth_state"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_telegram_user_account_form" model="ir.ui.view">
+        <field name="name">telegram.user.account.form</field>
+        <field name="model">telegram.user.account</field>
+        <field name="arch" type="xml">
+            <form string="Telegram Account">
+                <header>
+                    <button name="action_send_code" string="Send Code" type="object" class="btn-primary"/>
+                    <button name="action_verify_code" string="Verify Code" type="object"/>
+                    <button name="action_verify_password" string="Verify Password" type="object"/>
+                    <field name="auth_state" widget="statusbar" statusbar_visible="draft,code_sent,password_required,authorized,error"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="enabled"/>
+                            <field name="account_ref"/>
+                            <field name="phone_number"/>
+                            <field name="api_id"/>
+                            <field name="api_hash" password="True"/>
+                        </group>
+                        <group>
+                            <field name="auth_code" placeholder="Enter SMS/Telegram code"/>
+                            <field name="auth_password" password="True" placeholder="Enter 2FA password if needed"/>
+                            <field name="phone_code_hash" readonly="1"/>
+                            <field name="auth_expires_at" readonly="1"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="session_string" widget="text"/>
+                        <field name="last_error" readonly="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_telegram_user_account" model="ir.actions.act_window">
+        <field name="name">Telegram Accounts</field>
+        <field name="res_model">telegram.user.account</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <record id="view_telegram_auto_reply_route_tree" model="ir.ui.view">
+        <field name="name">telegram.auto.reply.route.tree</field>
+        <field name="model">telegram.auto.reply.route</field>
+        <field name="arch" type="xml">
+            <tree string="Telegram Auto Reply Routes">
+                <field name="enabled"/>
+                <field name="account_id"/>
+                <field name="account_ref"/>
+                <field name="phone_number"/>
+                <field name="chat_id"/>
+                <field name="keyword"/>
+                <field name="response"/>
+            </tree>
+        </field>
+    </record>
+
+    <record id="view_telegram_auto_reply_route_form" model="ir.ui.view">
+        <field name="name">telegram.auto.reply.route.form</field>
+        <field name="model">telegram.auto.reply.route</field>
+        <field name="arch" type="xml">
+            <form string="Telegram Auto Reply Route">
+                <sheet>
+                    <group>
+                        <field name="enabled"/>
+                        <field name="account_id"/>
+                        <field name="account_ref" readonly="1"/>
+                        <field name="phone_number" readonly="1"/>
+                        <field name="chat_id"/>
+                        <field name="keyword"/>
+                        <field name="response"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_telegram_auto_reply_route" model="ir.actions.act_window">
+        <field name="name">Telegram Auto Replies</field>
+        <field name="res_model">telegram.auto.reply.route</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+    <menuitem id="menu_telegram_sync_root" name="Telegram Sync" sequence="90"/>
+    <menuitem
+        id="menu_telegram_accounts"
+        name="Accounts"
+        parent="menu_telegram_sync_root"
+        action="action_telegram_user_account"
+        sequence="5"
+    />
+    <menuitem
+        id="menu_telegram_auto_reply_routes"
+        name="Auto Reply Routes"
+        parent="menu_telegram_sync_root"
+        action="action_telegram_auto_reply_route"
+        sequence="10"
+    />
+</odoo>

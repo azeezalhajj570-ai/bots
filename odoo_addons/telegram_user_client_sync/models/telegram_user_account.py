@@ -46,6 +46,10 @@ class TelegramUserAccount(models.Model):
     api_hash = fields.Char(required=True)
 
     session_string = fields.Text(copy=False)
+    manual_session_only = fields.Boolean(
+        default=True,
+        help="If enabled, login/2FA actions are disabled. Paste session_string manually (from Flask) instead.",
+    )
     enabled = fields.Boolean(default=True, index=True)
 
     auth_state = fields.Selection(
@@ -276,6 +280,12 @@ class TelegramUserAccount(models.Model):
         Sends login code to phone_number.
         """
         for rec in self:
+            if rec.manual_session_only:
+                raise UserError(
+                    _(
+                        "Manual session mode is enabled. Paste SESSION_STRING from Flask into this record instead."
+                    )
+                )
             rec._validate_login_prereqs()
 
             # Reset any previous attempt state
@@ -320,6 +330,12 @@ class TelegramUserAccount(models.Model):
 
     def action_resend_code(self):
         for rec in self:
+            if rec.manual_session_only:
+                raise UserError(
+                    _(
+                        "Manual session mode is enabled. Paste SESSION_STRING from Flask into this record instead."
+                    )
+                )
             rec._validate_login_prereqs()
             if not rec.phone_code_hash:
                 raise UserError(_("No previous code hash found. Click Send Code first."))
@@ -358,6 +374,12 @@ class TelegramUserAccount(models.Model):
         Verifies the SMS/Telegram code; if 2FA enabled, moves to password_required.
         """
         for rec in self:
+            if rec.manual_session_only:
+                raise UserError(
+                    _(
+                        "Manual session mode is enabled. Paste SESSION_STRING from Flask into this record instead."
+                    )
+                )
             rec._validate_login_prereqs()
 
             code = (rec.auth_code or "").strip()
@@ -463,6 +485,12 @@ class TelegramUserAccount(models.Model):
         Verifies 2FA password when required.
         """
         for rec in self:
+            if rec.manual_session_only:
+                raise UserError(
+                    _(
+                        "Manual session mode is enabled. Paste SESSION_STRING from Flask into this record instead."
+                    )
+                )
             rec._validate_login_prereqs()
 
             if rec.auth_state != "password_required":

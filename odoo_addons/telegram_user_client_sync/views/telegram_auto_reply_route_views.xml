@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-    <record id="view_telegram_user_account_tree" model="ir.ui.view">
-        <field name="name">telegram.user.account.tree</field>
+    <record id="view_telegram_user_account_list" model="ir.ui.view">
+        <field name="name">telegram.user.account.list</field>
         <field name="model">telegram.user.account</field>
         <field name="arch" type="xml">
-            <tree string="Telegram Accounts">
+            <list string="Telegram Accounts">
                 <field name="enabled"/>
                 <field name="account_ref"/>
                 <field name="phone_number"/>
                 <field name="auth_state"/>
-            </tree>
+            </list>
         </field>
     </record>
 
@@ -52,14 +52,14 @@
     <record id="action_telegram_user_account" model="ir.actions.act_window">
         <field name="name">Telegram Accounts</field>
         <field name="res_model">telegram.user.account</field>
-        <field name="view_mode">tree,form</field>
+        <field name="view_mode">list,form</field>
     </record>
 
-    <record id="view_telegram_auto_reply_route_tree" model="ir.ui.view">
-        <field name="name">telegram.auto.reply.route.tree</field>
+    <record id="view_telegram_auto_reply_route_list" model="ir.ui.view">
+        <field name="name">telegram.auto.reply.route.list</field>
         <field name="model">telegram.auto.reply.route</field>
         <field name="arch" type="xml">
-            <tree string="Telegram Auto Reply Routes">
+            <list string="Telegram Auto Reply Routes">
                 <field name="enabled"/>
                 <field name="account_id"/>
                 <field name="account_ref"/>
@@ -67,7 +67,7 @@
                 <field name="chat_id"/>
                 <field name="keyword"/>
                 <field name="response"/>
-            </tree>
+            </list>
         </field>
     </record>
 
@@ -94,7 +94,7 @@
     <record id="action_telegram_auto_reply_route" model="ir.actions.act_window">
         <field name="name">Telegram Auto Replies</field>
         <field name="res_model">telegram.auto.reply.route</field>
-        <field name="view_mode">tree,form</field>
+        <field name="view_mode">list,form</field>
     </record>
 
     <menuitem id="menu_telegram_sync_root" name="Telegram Sync" sequence="90"/>

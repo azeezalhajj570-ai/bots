@@ -27,9 +27,11 @@ from .handlers.commands import (
     make_addgate_cmd,
     make_addroute_cmd,
     make_addrule_cmd,
+    contact_cmd,
     make_delgate_cmd,
     make_delroute_cmd,
     make_delrule_cmd,
+    help_cmd,
     make_listgates_cmd,
     make_listroutes_cmd,
     make_listrules_cmd,
@@ -37,6 +39,7 @@ from .handlers.commands import (
     make_resetwarns_cmd,
     make_settings_cmd,
     start_cmd,
+    support_cmd,
 )
 from .handlers.hide_system import make_hide_system_handler
 from .storage import BotRepository
@@ -47,14 +50,14 @@ log = logging.getLogger(__name__)
 def build_app(cfg: Config, db: BotRepository, cache: Cache) -> Application:
     async def _error_handler(update, context) -> None:
         error = context.error
+        if isinstance(error, BadRequest) and "message is not modified" in str(error).lower():
+            log.debug("Ignored no-op edit: %s", error)
+            return
         if isinstance(error, RetryAfter):
             log.warning("Telegram flood control. Retry after %s seconds.", error.retry_after)
             return
         if isinstance(error, (NetworkError, TimedOut)):
             log.warning("Transient Telegram network error: %s", error)
-            return
-        if isinstance(error, BadRequest) and "Message is not modified" in str(error):
-            log.debug("Ignored no-op edit: %s", error)
             return
         log.exception("Unhandled bot error", exc_info=error)
 
@@ -62,6 +65,9 @@ def build_app(cfg: Config, db: BotRepository, cache: Cache) -> Application:
         await application.bot.set_my_commands(
             [
                 BotCommand("start", "Start the bot"),
+                BotCommand("help", "Show help"),
+                BotCommand("support", "Support information"),
+                BotCommand("contact", "Contact information"),
                 BotCommand("settings", "Open moderation settings"),
                 BotCommand("resetwarns", "Reset replied user warnings"),
                 BotCommand("addrule", "Add dynamic remove regex"),
@@ -90,6 +96,9 @@ def build_app(cfg: Config, db: BotRepository, cache: Cache) -> Application:
     )
 
     app.add_handler(CommandHandler("start", start_cmd))
+    app.add_handler(CommandHandler("help", help_cmd))
+    app.add_handler(CommandHandler("support", support_cmd))
+    app.add_handler(CommandHandler("contact", contact_cmd))
     app.add_handler(CommandHandler("settings", make_settings_cmd(db)))
     app.add_handler(CommandHandler("resetwarns", make_resetwarns_cmd(db)))
     app.add_handler(CommandHandler("addrule", make_addrule_cmd(db)))

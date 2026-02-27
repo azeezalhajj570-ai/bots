@@ -81,12 +81,38 @@ class Executor:
                 if not await bot_can_ban(context, chat_id):
                     log.warning("Bot cannot ban in chat=%s. Needs can_restrict_members.", chat_id)
                     return
-                for target_user_id in target_user_ids:
+                if self.db.get_setting(chat_id, "temp_ban_before_remove"):
+                    temp_seconds = self.db.get_int_setting(chat_id, "temp_ban_seconds", 600)
+                    if temp_seconds < 60:
+                        temp_seconds = 60
+                    until = int(time.time()) + temp_seconds
+                    for target_user_id in target_user_ids:
+                        try:
+                            await context.bot.restrict_chat_member(
+                                chat_id=chat_id,
+                                user_id=target_user_id,
+                                permissions=ChatPermissions(can_send_messages=False),
+                                until_date=until,
+                            )
+                            log.info("Temp banned(restricted) chat=%s user=%s seconds=%s", chat_id, target_user_id, temp_seconds)
+                        except Exception as exc:
+                            log.error("Failed to temp ban chat=%s user=%s error=%s", chat_id, target_user_id, exc)
                     try:
-                        await context.bot.ban_chat_member(chat_id, target_user_id)
-                        log.info("Banned bot chat=%s user=%s", chat_id, target_user_id)
-                    except Exception as exc:
-                        log.error("Failed to ban bot chat=%s user=%s error=%s", chat_id, target_user_id, exc)
+                        names = bag.get("ban_display_names") or [str(uid) for uid in target_user_ids]
+                        await context.bot.send_message(
+                            chat_id,
+                            f"Temporary ban applied for {_format_mute_duration(temp_seconds)}: {', '.join(names)}",
+                            parse_mode="HTML",
+                        )
+                    except Exception:
+                        pass
+                else:
+                    for target_user_id in target_user_ids:
+                        try:
+                            await context.bot.ban_chat_member(chat_id, target_user_id)
+                            log.info("Banned bot chat=%s user=%s", chat_id, target_user_id)
+                        except Exception as exc:
+                            log.error("Failed to ban bot chat=%s user=%s error=%s", chat_id, target_user_id, exc)
 
         if not decision.delete:
             return

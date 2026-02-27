@@ -6,7 +6,12 @@ import re
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
-from ..keyboards import build_settings_keyboard, settings_text
+from ..i18n import get_user_lang, tr
+from ..keyboards import (
+    build_group_settings_home_keyboard,
+    build_main_menu_keyboard,
+    build_private_settings_keyboard,
+)
 from ..storage import BotRepository
 from ..telegram_helpers import is_admin, is_group_chat
 
@@ -16,13 +21,42 @@ log = logging.getLogger(__name__)
 async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not update.message:
         return
+    lang = get_user_lang(context, update.effective_user.language_code if update.effective_user else None)
+    if update.effective_chat and update.effective_chat.type == "private":
+        await update.message.reply_text(
+            tr(lang, "welcome"),
+            reply_markup=build_main_menu_keyboard(lang),
+        )
+        return
+
     await update.message.reply_text(
         "Bot is running.\n"
-        "Use /settings inside the group.\n\n"
+        "Use /settings inside this group.\n\n"
         "Required bot permissions:\n"
         "- Delete messages\n"
         "- Ban/Restrict users"
     )
+
+
+async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not update.message:
+        return
+    lang = get_user_lang(context, update.effective_user.language_code if update.effective_user else None)
+    await update.message.reply_text(tr(lang, "help_text"), disable_web_page_preview=True)
+
+
+async def support_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not update.message:
+        return
+    lang = get_user_lang(context, update.effective_user.language_code if update.effective_user else None)
+    await update.message.reply_text(tr(lang, "support_text"), disable_web_page_preview=True)
+
+
+async def contact_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not update.message:
+        return
+    lang = get_user_lang(context, update.effective_user.language_code if update.effective_user else None)
+    await update.message.reply_text(tr(lang, "contact_text"), disable_web_page_preview=True)
 
 
 def _is_sender_chat_message(update: Update) -> bool:
@@ -149,6 +183,37 @@ async def _resolve_group_token_any(
     return chat.id, title, join_url
 
 
+def _parse_bulk_routes(raw: str) -> tuple[list[tuple[str, str]], str | None]:
+    pairs: list[tuple[str, str]] = []
+    for line in raw.splitlines():
+        item = line.strip()
+        if not item:
+            continue
+        if ":" not in item:
+            return [], item
+        keyword, destination = item.split(":", 1)
+        key = keyword.strip().lower()
+        val = destination.strip()
+        if not key or not val:
+            return [], item
+        pairs.append((key, val))
+    return pairs, None
+
+
+def _parse_bulk_keywords(raw: str) -> list[str]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for line in raw.splitlines():
+        keyword = line.strip().lower()
+        if not keyword:
+            continue
+        if keyword in seen:
+            continue
+        seen.add(keyword)
+        out.append(keyword)
+    return out
+
+
 async def _resolve_target_group(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
@@ -183,6 +248,7 @@ def make_settings_cmd(db: BotRepository):
     async def settings_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if not update.message or not update.effective_chat:
             return
+        lang = get_user_lang(context, update.effective_user.language_code if update.effective_user else None)
 
         if update.effective_chat.type == "private":
             if context.args:
@@ -190,8 +256,8 @@ def make_settings_cmd(db: BotRepository):
             else:
                 context.user_data["await_group_usernames"] = True
                 await update.message.reply_text(
-                    "Send one or more group usernames or t.me links.\n"
-                    "Example: @group1 @group2 or https://t.me/group1"
+                    tr(lang, "choose_group_settings"),
+                    reply_markup=build_private_settings_keyboard(lang),
                 )
             return
 
@@ -220,9 +286,8 @@ def make_settings_cmd(db: BotRepository):
 
         db.ensure_group(chat_id)
         await update.message.reply_text(
-            settings_text(db, chat_id),
-            reply_markup=build_settings_keyboard(db, chat_id),
-            parse_mode="Markdown",
+            tr(lang, "group_settings_home_short"),
+            reply_markup=build_group_settings_home_keyboard(chat_id, lang),
             disable_web_page_preview=True,
         )
 
@@ -234,8 +299,33 @@ def make_private_settings_input_handler(db: BotRepository):
         if not update.message or not update.effective_chat or update.effective_chat.type != "private":
             return
         text = (update.message.text or "").strip()
+        normalized = text.lower()
+        lang = get_user_lang(context, update.effective_user.language_code if update.effective_user else None)
+
+        if normalized == "cancel":
+            context.user_data.pop("addroute_wizard", None)
+            context.user_data.pop("ban_keyword_wizard", None)
+            context.user_data["await_group_usernames"] = False
+            await update.message.reply_text(tr(lang, "cancelled"))
+            return
 
         if not context.user_data.get("await_group_usernames"):
+            ban_keyword_wizard = context.user_data.get("ban_keyword_wizard")
+            if ban_keyword_wizard:
+                keywords = _parse_bulk_keywords(text)
+                if not keywords:
+                    await update.message.reply_text(tr(lang, "ban_keyword_invalid"))
+                    return
+                chat_id = int(ban_keyword_wizard["chat_id"])
+                for keyword in keywords:
+                    db.add_dynamic_rule(chat_id, re.escape(keyword))
+                context.user_data.pop("ban_keyword_wizard", None)
+                await update.message.reply_text(
+                    tr(lang, "ban_keyword_saved", count=len(keywords), chat_id=chat_id),
+                    parse_mode="Markdown",
+                )
+                return
+
             route_wizard = context.user_data.get("addroute_wizard")
             if route_wizard:
                 step = route_wizard.get("step")
@@ -248,42 +338,98 @@ def make_private_settings_input_handler(db: BotRepository):
                     route_wizard["chat_id"] = chat_id
                     route_wizard["step"] = "keyword"
                     context.user_data["addroute_wizard"] = route_wizard
-                    await update.message.reply_text("Send the keyword trigger (example: اعلان)")
+                    await update.message.reply_text(tr(lang, "wizard_keyword_prompt"))
                     return
 
                 if step == "keyword":
                     if not text:
                         await update.message.reply_text("Keyword cannot be empty. Send a keyword.")
                         return
+                    if ":" in text:
+                        if "\n" in text:
+                            bulk_pairs, invalid_line = _parse_bulk_routes(text)
+                            if invalid_line is not None:
+                                await update.message.reply_text(
+                                    tr(lang, "wizard_bulk_invalid_line", line=invalid_line),
+                                    parse_mode="Markdown",
+                                )
+                                return
+                            if not bulk_pairs:
+                                await update.message.reply_text(
+                                    tr(lang, "wizard_bulk_invalid_line", line=text),
+                                    parse_mode="Markdown",
+                                )
+                                return
+                            chat_id = int(route_wizard["chat_id"])
+                            for keyword, destination in bulk_pairs:
+                                db.upsert_link_route(chat_id, keyword, destination, None)
+                            context.user_data.pop("addroute_wizard", None)
+                            await update.message.reply_text(
+                                tr(lang, "wizard_saved_bulk", count=len(bulk_pairs), chat_id=chat_id),
+                                parse_mode="Markdown",
+                                disable_web_page_preview=True,
+                            )
+                            return
+                        one_pairs, invalid_line = _parse_bulk_routes(text)
+                        if invalid_line is not None or not one_pairs:
+                            await update.message.reply_text(
+                                tr(lang, "wizard_bulk_invalid_line", line=text),
+                                parse_mode="Markdown",
+                            )
+                            return
+                        chat_id = int(route_wizard["chat_id"])
+                        keyword, destination = one_pairs[0]
+                        db.upsert_link_route(chat_id, keyword, destination, None)
+                        context.user_data.pop("addroute_wizard", None)
+                        await update.message.reply_text(
+                            tr(lang, "wizard_saved_single", chat_id=chat_id, keyword=keyword, destination=destination),
+                            parse_mode="Markdown",
+                            disable_web_page_preview=True,
+                        )
+                        return
                     route_wizard["keyword"] = text.lower()
                     route_wizard["step"] = "destination"
                     context.user_data["addroute_wizard"] = route_wizard
-                    await update.message.reply_text("Send the destination content (URL or message text).")
+                    await update.message.reply_text(tr(lang, "wizard_destination_prompt"))
                     return
 
                 if step == "destination":
-                    destination = text
-                    if not destination:
+                    if not text:
                         await update.message.reply_text("Destination cannot be empty. Send URL or message text.")
                         return
                     chat_id = int(route_wizard["chat_id"])
+                    if "\n" in text:
+                        bulk_pairs, invalid_line = _parse_bulk_routes(text)
+                        if invalid_line is not None:
+                            await update.message.reply_text(
+                                tr(lang, "wizard_bulk_invalid_line", line=invalid_line),
+                                parse_mode="Markdown",
+                            )
+                            return
+                        if bulk_pairs:
+                            for keyword, destination in bulk_pairs:
+                                db.upsert_link_route(chat_id, keyword, destination, None)
+                            context.user_data.pop("addroute_wizard", None)
+                            await update.message.reply_text(
+                                tr(lang, "wizard_saved_bulk", count=len(bulk_pairs), chat_id=chat_id),
+                                parse_mode="Markdown",
+                                disable_web_page_preview=True,
+                            )
+                            return
+                    destination = text
                     keyword = str(route_wizard["keyword"])
                     db.upsert_link_route(chat_id, keyword, destination, None)
                     context.user_data.pop("addroute_wizard", None)
                     await update.message.reply_text(
-                        f"Route saved for chat `{chat_id}`:\n`{keyword}` -> {destination}",
+                        tr(lang, "wizard_saved_single", chat_id=chat_id, keyword=keyword, destination=destination),
                         parse_mode="Markdown",
                         disable_web_page_preview=True,
                     )
                     return
 
-            normalized = text.lower()
             if normalized in {"add route", "addroute", "add rule", "addrule"}:
                 context.user_data["addroute_wizard"] = {"step": "group"}
-                await update.message.reply_text(
-                    "Route setup wizard started.\n"
-                    "Step 1/3: send target group username or t.me link."
-                )
+                await update.message.reply_text(tr(lang, "wizard_started_group"))
             return
 
         context.user_data["await_group_usernames"] = False
@@ -409,12 +555,10 @@ def make_addroute_cmd(db: BotRepository):
     async def addroute_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if not update.message:
             return
+        lang = get_user_lang(context, update.effective_user.language_code if update.effective_user else None)
         if update.effective_chat and update.effective_chat.type == "private" and not context.args:
             context.user_data["addroute_wizard"] = {"step": "group"}
-            await update.message.reply_text(
-                "Route setup wizard started.\n"
-                "Step 1/3: send target group username or t.me link."
-            )
+            await update.message.reply_text(tr(lang, "wizard_started_group"))
             return
         resolved = await _resolve_target_group(
             update,
@@ -439,7 +583,11 @@ def make_addroute_cmd(db: BotRepository):
                 await update.message.reply_text("gate_group_id must be a number.")
                 return
         db.upsert_link_route(chat_id, keyword, destination, gate_group_id)
-        await update.message.reply_text(f"Route saved for chat `{chat_id}`.", parse_mode="Markdown")
+        await update.message.reply_text(
+            tr(lang, "wizard_saved_single", chat_id=chat_id, keyword=keyword, destination=destination),
+            parse_mode="Markdown",
+            disable_web_page_preview=True,
+        )
 
     return addroute_cmd
 

@@ -41,15 +41,40 @@ class DB(BotRepository):
         if "warn_in_group" not in columns:
             self.conn.execute("ALTER TABLE group_settings ADD COLUMN warn_in_group INTEGER DEFAULT 1")
             log.info("Migrated database: added group_settings.warn_in_group")
+        if "temp_ban_before_remove" not in columns:
+            self.conn.execute("ALTER TABLE group_settings ADD COLUMN temp_ban_before_remove INTEGER DEFAULT 0")
+            log.info("Migrated database: added group_settings.temp_ban_before_remove")
+        if "temp_ban_seconds" not in columns:
+            self.conn.execute("ALTER TABLE group_settings ADD COLUMN temp_ban_seconds INTEGER DEFAULT 600")
+            log.info("Migrated database: added group_settings.temp_ban_seconds")
 
     def ensure_group(self, chat_id: int) -> None:
         self.conn.execute("INSERT OR IGNORE INTO group_settings(chat_id) VALUES (?)", (chat_id,))
         self.conn.commit()
 
+    def list_groups(self) -> list[int]:
+        rows = self.conn.execute("SELECT chat_id FROM group_settings ORDER BY chat_id ASC").fetchall()
+        return [int(row[0]) for row in rows]
+
     def get_setting(self, chat_id: int, key: str) -> bool:
         self.ensure_group(chat_id)
         row = self.conn.execute(f"SELECT {key} FROM group_settings WHERE chat_id=?", (chat_id,)).fetchone()
         return bool(row[0]) if row else True
+
+    def get_int_setting(self, chat_id: int, key: str, default: int = 0) -> int:
+        self.ensure_group(chat_id)
+        row = self.conn.execute(f"SELECT {key} FROM group_settings WHERE chat_id=?", (chat_id,)).fetchone()
+        if not row or row[0] is None:
+            return default
+        try:
+            return int(row[0])
+        except (TypeError, ValueError):
+            return default
+
+    def set_int_setting(self, chat_id: int, key: str, value: int) -> None:
+        self.ensure_group(chat_id)
+        self.conn.execute(f"UPDATE group_settings SET {key}=? WHERE chat_id=?", (int(value), chat_id))
+        self.conn.commit()
 
     def toggle_setting(self, chat_id: int, key: str) -> bool:
         cur = self.get_setting(chat_id, key)

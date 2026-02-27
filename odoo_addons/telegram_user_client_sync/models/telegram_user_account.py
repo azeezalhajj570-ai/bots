@@ -326,12 +326,13 @@ class TelegramUserAccount(models.Model):
 
             pair = rec._get_pending_client()
             if pair is None:
-                raise UserError(
-                    _(
-                        "Pending login context not found. "
-                        "Click Send Code again, then Resend/Verify in the same worker/session."
-                    )
+                _logger.warning(
+                    "Pending login context missing for record %s; fallback to fresh send_code on pid=%s",
+                    rec.id,
+                    os.getpid(),
                 )
+                rec.action_send_code()
+                return True
             client, loop = pair
             try:
                 asyncio.set_event_loop(loop)

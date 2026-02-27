@@ -14,13 +14,18 @@ _logger = logging.getLogger(__name__)
 # Dependency guard: distinguish "not installed" from "installed but import failed"
 try:
     from pyrogram import Client
+    from pyrogram.errors import PhoneCodeExpired, PhoneCodeInvalid
     from pyrogram.errors import SessionPasswordNeeded
 except ImportError as e:  # genuinely missing
     Client = None  # type: ignore[assignment]
+    PhoneCodeExpired = Exception  # type: ignore[assignment]
+    PhoneCodeInvalid = Exception  # type: ignore[assignment]
     SessionPasswordNeeded = Exception  # type: ignore[assignment]
     _logger.warning("Pyrogram is not installed (ImportError): %s", e)
 except Exception as e:  # installed but failing to load for some reason
     Client = None  # type: ignore[assignment]
+    PhoneCodeExpired = Exception  # type: ignore[assignment]
+    PhoneCodeInvalid = Exception  # type: ignore[assignment]
     SessionPasswordNeeded = Exception  # type: ignore[assignment]
     _logger.exception("Pyrogram failed to import due to runtime error: %s", e)
 
@@ -250,6 +255,26 @@ class TelegramUserAccount(models.Model):
                         "last_error": False,
                     }
                 )
+            except PhoneCodeExpired:
+                rec.write(
+                    {
+                        "auth_state": "draft",
+                        "auth_code": False,
+                        "phone_code_hash": False,
+                        "auth_expires_at": False,
+                        "last_error": _("Code expired. Please click Send Code again."),
+                    }
+                )
+                raise UserError(_("Code expired. Please click Send Code again."))
+            except PhoneCodeInvalid:
+                rec.write(
+                    {
+                        "auth_state": "code_sent",
+                        "auth_code": False,
+                        "last_error": _("Invalid code. Please enter the latest code sent to Telegram."),
+                    }
+                )
+                raise UserError(_("Invalid code. Please enter the latest code sent to Telegram."))
             except Exception as exc:
                 rec._set_error(exc, "Failed to verify code")
         return True

@@ -204,6 +204,14 @@ class TelegramUserAccount(models.Model):
         _logger.exception("%s (record %s): %s", user_prefix, self.id, msg)
         raise UserError(_("%s: %s") % (user_prefix, exc)) from exc
 
+    def _telegram_error_text(self, exc: Exception) -> str:
+        self.ensure_one()
+        parts = [f"{type(exc).__name__}: {exc}"]
+        for attr in ("CODE", "ID", "MESSAGE", "VALUE"):
+            if hasattr(exc, attr):
+                parts.append(f"{attr}={getattr(exc, attr)}")
+        return " | ".join(parts)
+
     # -----------------------
     # Actions
     # -----------------------
@@ -291,7 +299,9 @@ class TelegramUserAccount(models.Model):
                         "last_error": False,
                     }
                 )
-            except PhoneCodeExpired:
+            except PhoneCodeExpired as exc:
+                tg_error = rec._telegram_error_text(exc)
+                _logger.warning("Telegram verify_code expired (record %s): %s", rec.id, tg_error)
                 rec.write(
                     {
                         "auth_state": "draft",
@@ -299,19 +309,21 @@ class TelegramUserAccount(models.Model):
                         "phone_code_hash": False,
                         "login_session_string": False,
                         "auth_expires_at": False,
-                        "last_error": _("Code expired. Please click Send Code again."),
+                        "last_error": tg_error,
                     }
                 )
-                raise UserError(_("Code expired. Please click Send Code again."))
-            except PhoneCodeInvalid:
+                raise UserError(_("Telegram returned code expired. Check last_error and click Send Code again."))
+            except PhoneCodeInvalid as exc:
+                tg_error = rec._telegram_error_text(exc)
+                _logger.warning("Telegram verify_code invalid (record %s): %s", rec.id, tg_error)
                 rec.write(
                     {
                         "auth_state": "code_sent",
                         "auth_code": False,
-                        "last_error": _("Invalid code. Please enter the latest code sent to Telegram."),
+                        "last_error": tg_error,
                     }
                 )
-                raise UserError(_("Invalid code. Please enter the latest code sent to Telegram."))
+                raise UserError(_("Telegram returned invalid code. Check last_error and enter latest code."))
             except Exception as exc:
                 rec._set_error(exc, "Failed to verify code")
         return True

@@ -104,12 +104,32 @@ class TelegramUserAccount(models.Model):
         if not self.enabled:
             raise UserError(_("This Telegram user account is disabled."))
 
-        phone = (self.phone_number or "").strip()
+        phone = self._normalized_phone()
         if not phone or not phone.startswith("+") or len(phone) < 8:
             raise UserError(_("Phone number must be in international format, e.g. +15551234567."))
 
-        if not self.api_id or not self.api_hash:
+        if not self.api_hash:
             raise UserError(_("API ID and API Hash are required."))
+        _ = self._api_id_int()
+
+    def _normalized_phone(self) -> str:
+        self.ensure_one()
+        raw = (self.phone_number or "").strip()
+        if not raw:
+            return ""
+        prefix = "+" if raw.startswith("+") else ""
+        digits = "".join(ch for ch in raw if ch.isdigit())
+        return f"{prefix}{digits}" if prefix else digits
+
+    def _api_id_int(self) -> int:
+        self.ensure_one()
+        try:
+            value = int(self.api_id)
+        except Exception as exc:
+            raise UserError(_("API ID must be an integer.")) from exc
+        if value <= 0:
+            raise UserError(_("API ID must be a positive integer."))
+        return value
 
     def _now_utc(self) -> datetime:
         # Odoo stores datetimes in UTC by default; keep logic in UTC
@@ -151,7 +171,7 @@ class TelegramUserAccount(models.Model):
         if use_login_session and self.login_session_string:
             client = Client(
                 name=f"{self._session_name()}_tmp",
-                api_id=int(self.api_id),
+                api_id=self._api_id_int(),
                 api_hash=self.api_hash,
                 session_string=self.login_session_string,
                 in_memory=True,
@@ -159,7 +179,7 @@ class TelegramUserAccount(models.Model):
         else:
             client = Client(
                 name=self._session_name(),
-                api_id=int(self.api_id),
+                api_id=self._api_id_int(),
                 api_hash=self.api_hash,
             )
 
@@ -206,7 +226,7 @@ class TelegramUserAccount(models.Model):
 
             try:
                 with rec._client() as client:
-                    phone = rec.phone_number.strip()
+                    phone = rec._normalized_phone()
                     sent = client.send_code(phone)
                     login_session_string = client.export_session_string()
 
@@ -245,7 +265,7 @@ class TelegramUserAccount(models.Model):
             try:
                 with rec._client(use_login_session=True) as client:
                     client.sign_in(
-                        phone_number=rec.phone_number.strip(),
+                        phone_number=rec._normalized_phone(),
                         phone_code_hash=rec.phone_code_hash,
                         phone_code=code,
                     )

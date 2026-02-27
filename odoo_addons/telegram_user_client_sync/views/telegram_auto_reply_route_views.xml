@@ -20,6 +20,7 @@
             <form string="Telegram Account">
                 <header>
                     <button name="action_send_code" string="Send Code" type="object" class="btn-primary"/>
+                    <button name="action_resend_code" string="Resend Code" type="object"/>
                     <button name="action_verify_code" string="Verify Code" type="object"/>
                     <button name="action_verify_password" string="Verify Password" type="object"/>
                     <field name="auth_state" widget="statusbar" statusbar_visible="draft,code_sent,password_required,authorized,error"/>
@@ -38,6 +39,9 @@
                             <field name="auth_password" password="True" placeholder="Enter 2FA password if needed"/>
                             <field name="phone_code_hash" readonly="1"/>
                             <field name="auth_expires_at" readonly="1"/>
+                            <field name="code_delivery_type" readonly="1"/>
+                            <field name="code_next_type" readonly="1"/>
+                            <field name="code_timeout_seconds" readonly="1"/>
                         </group>
                     </group>
                     <group>

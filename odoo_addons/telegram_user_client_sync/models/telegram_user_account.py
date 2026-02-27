@@ -67,6 +67,9 @@ class TelegramUserAccount(models.Model):
     phone_code_hash = fields.Char(copy=False)
     login_session_string = fields.Text(copy=False)
     auth_expires_at = fields.Datetime(copy=False)
+    code_delivery_type = fields.Char(copy=False, readonly=True)
+    code_next_type = fields.Char(copy=False, readonly=True)
+    code_timeout_seconds = fields.Integer(copy=False, readonly=True)
 
     last_error = fields.Text(copy=False)
 
@@ -204,6 +207,9 @@ class TelegramUserAccount(models.Model):
                 "phone_code_hash": False,
                 "login_session_string": False,
                 "auth_expires_at": False,
+                "code_delivery_type": False,
+                "code_next_type": False,
+                "code_timeout_seconds": False,
             }
         )
 
@@ -300,6 +306,9 @@ class TelegramUserAccount(models.Model):
                         "login_session_string": False,
                         "auth_state": "code_sent",
                         "auth_expires_at": fields.Datetime.to_string(rec._now_utc() + timedelta(minutes=10)),
+                        "code_delivery_type": str(getattr(sent, "type", "") or ""),
+                        "code_next_type": str(getattr(sent, "next_type", "") or ""),
+                        "code_timeout_seconds": int(getattr(sent, "timeout", 0) or 0),
                         "last_error": False,
                     }
                 )
@@ -307,6 +316,40 @@ class TelegramUserAccount(models.Model):
             except Exception as exc:
                 rec._disconnect_client(rec._pop_pending_client())
                 rec._set_error(exc, "Failed to send login code")
+        return True
+
+    def action_resend_code(self):
+        for rec in self:
+            rec._validate_login_prereqs()
+            if not rec.phone_code_hash:
+                raise UserError(_("No previous code hash found. Click Send Code first."))
+
+            pair = rec._get_pending_client()
+            if pair is None:
+                raise UserError(
+                    _(
+                        "Pending login context not found. "
+                        "Click Send Code again, then Resend/Verify in the same worker/session."
+                    )
+                )
+            client, loop = pair
+            try:
+                asyncio.set_event_loop(loop)
+                sent = client.resend_code(rec._normalized_phone(), rec.phone_code_hash)
+                rec.write(
+                    {
+                        "phone_code_hash": sent.phone_code_hash,
+                        "auth_state": "code_sent",
+                        "auth_expires_at": fields.Datetime.to_string(rec._now_utc() + timedelta(minutes=10)),
+                        "code_delivery_type": str(getattr(sent, "type", "") or ""),
+                        "code_next_type": str(getattr(sent, "next_type", "") or ""),
+                        "code_timeout_seconds": int(getattr(sent, "timeout", 0) or 0),
+                        "last_error": False,
+                    }
+                )
+                _logger.info("Code resent for record %s on pid=%s", rec.id, os.getpid())
+            except Exception as exc:
+                rec._set_error(exc, "Failed to resend login code")
         return True
 
     def action_verify_code(self):
